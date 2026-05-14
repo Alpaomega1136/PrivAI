@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -7,6 +6,7 @@ from fastapi import HTTPException, status
 from app.ai.class_map import CANONICAL_CLASSES, normalize_class_name
 from app.core.config import get_settings
 from app.core.redaction_policy import get_redaction_rule, validate_redaction_mode
+from app.utils.time_utils import now_wib_iso
 
 settings = get_settings()
 ALLOWED_POLICY_KEYS = {"policy_name", "confidence_threshold", "profile", "redaction_mode", "active_classes", "disabled_classes", "label_text", "injection_note", "updated_at"}
@@ -22,7 +22,7 @@ def default_runtime_policy() -> dict[str, Any]:
         "disabled_classes": [],
         "label_text": "REDACTED",
         "injection_note": "Default policy",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now_wib_iso(),
     }
 
 
@@ -39,7 +39,7 @@ def _validate_policy(payload: dict[str, Any]) -> dict[str, Any]:
     policy["confidence_threshold"] = confidence
     policy["active_classes"] = [normalize_class_name(str(item)) for item in policy.get("active_classes") or []]
     policy["disabled_classes"] = [normalize_class_name(str(item)) for item in policy.get("disabled_classes") or []]
-    policy["updated_at"] = datetime.now(timezone.utc).isoformat()
+    policy["updated_at"] = now_wib_iso()
     return policy
 
 

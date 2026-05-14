@@ -11,6 +11,7 @@ from app.db.repositories import GovernmentAccessRequestRepository, SovereignVaul
 from app.services.audit_service import create_audit_log
 from app.services.vault_service import decrypt_original_from_vault
 from app.utils.hash_utils import sha256_bytes
+from app.utils.time_utils import to_wib_iso
 
 settings = get_settings()
 
@@ -58,7 +59,7 @@ def approve_access_request(db: Session, request_id: str, approved_by: str) -> tu
     request.approved_at = utc_now()
     request.access_token_hash = sha256_bytes(token.encode("utf-8"))
     request.access_token_expires_at = utc_now() + timedelta(minutes=15)
-    create_audit_log(db, request.record_id, "Government Access API", "access_request_approved", approved_by, "Government access request approved", {"request_id": request.request_id, "expires_at": request.access_token_expires_at.isoformat()})
+    create_audit_log(db, request.record_id, "Government Access API", "access_request_approved", approved_by, "Government access request approved", {"request_id": request.request_id, "expires_at": to_wib_iso(request.access_token_expires_at)})
     return request, token
 
 
@@ -78,10 +79,10 @@ def serialize_access_request(request: GovernmentAccessRequest) -> dict[str, Any]
         "reason": request.reason,
         "status": request.status,
         "approved_by": request.approved_by,
-        "created_at": request.created_at.isoformat() if request.created_at else None,
-        "approved_at": request.approved_at.isoformat() if request.approved_at else None,
-        "access_token_expires_at": request.access_token_expires_at.isoformat() if request.access_token_expires_at else None,
-        "access_token_used_at": request.access_token_used_at.isoformat() if request.access_token_used_at else None,
+        "created_at": to_wib_iso(request.created_at),
+        "approved_at": to_wib_iso(request.approved_at),
+        "access_token_expires_at": to_wib_iso(request.access_token_expires_at),
+        "access_token_used_at": to_wib_iso(request.access_token_used_at),
     }
 
 

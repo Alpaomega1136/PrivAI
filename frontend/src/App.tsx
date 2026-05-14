@@ -67,6 +67,17 @@ const emptyResult = <T,>(): ApiResult<T> => ({ ok: false, error: { status: 0, me
 
 const PRIVACY_CLASSES = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
 
+function formatWibDate(value: unknown): string {
+  if (!value) return "-";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(date);
+}
+
 function normalizePrivacyClasses(value: unknown, fallback: string[] = PRIVACY_CLASSES): string[] {
   const rawItems = Array.isArray(value)
     ? value.map(String)
@@ -477,7 +488,7 @@ function OperationalZone({ recordsResult }: { recordsResult: ApiResult<{ records
                         <small>{Number(record.detection_count ?? 0)} deteksi</small>
                         <small>{Number(record.redacted_count ?? 0)} diredaksi</small>
                       </td>
-                      <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
+                      <td><small>{formatWibDate(record.created_at)} WIB</small></td>
                       <td>
                         {redactedUrl ? (
                           <div className="table-actions">
@@ -622,7 +633,7 @@ function VaultView({ records, keyInfo }: { records: Array<Record<string, unknown
                   <td><strong>{String(record.record_id).substring(0,8)}...</strong></td>
                   <td>{String(record.original_filename ?? "-")}</td>
                   <td>{record.vault_encrypted ? <span className="badge green">Ya</span> : <span className="badge danger">Tidak</span>}</td>
-                  <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
+                  <td><small>{formatWibDate(record.created_at)} WIB</small></td>
                   <td>
                     <button type="button" className="primary-button secondary-button" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => handleRowClick(String(record.record_id))}>Lihat Detail</button>
                   </td>
@@ -1220,7 +1231,7 @@ function AuditLogView({ initialLogs }: { initialLogs: ApiResult<{ logs: AuditLog
                       <td><div className={`badge ${badgeClass}`}>{log.zone}</div></td>
                       <td>{log.actor}</td>
                       <td>{log.record_id ? String(log.record_id).substring(0,8) + "..." : "-"}</td>
-                      <td><small>{log.created_at ? new Date(log.created_at).toLocaleString("id-ID") : "-"}</small></td>
+                      <td><small>{formatWibDate(log.created_at)} WIB</small></td>
                     </tr>
                   )
                 })}

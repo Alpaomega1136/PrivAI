@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.repositories import OperationalMetadataRepository, SovereignVaultRepository
 from app.services.storage_service import get_redacted_file_path
+from app.utils.time_utils import to_wib_iso
 
 router = APIRouter(tags=["storage"])
 
@@ -54,6 +55,6 @@ def storage_records(db: Annotated[Session, Depends(get_db)], limit: int = Query(
             "vault_encrypted": bool(vault),
             "vault_key_id": vault.key_id if vault else None,
             "vault_key_version": vault.key_version if vault else None,
-            "created_at": op.created_at.isoformat() if op.created_at else None,
+            "created_at": to_wib_iso(op.created_at),
         })
     return {"records": records, "count": len(records)}

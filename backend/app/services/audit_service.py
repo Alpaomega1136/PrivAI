@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.db.models import AuditLog
 from app.db.repositories import AuditLogRepository
+from app.utils.time_utils import to_wib_iso
 
 
 def _json_default(value: Any) -> str:
     if hasattr(value, "isoformat"):
-        return value.isoformat()
+        return to_wib_iso(value)
     return str(value)
 
 
@@ -51,7 +52,7 @@ def serialize_audit_log(entry: AuditLog) -> dict[str, Any]:
         "actor": entry.actor,
         "action": entry.action,
         "details": parse_audit_details(entry.details_json),
-        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+        "created_at": to_wib_iso(entry.created_at),
     }
 
 

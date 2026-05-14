@@ -16,6 +16,7 @@ from app.services.government_access_service import (
     validate_approver_token,
     validate_government_token,
 )
+from app.utils.time_utils import to_wib_iso
 
 router = APIRouter(tags=["government-access"])
 
@@ -37,7 +38,7 @@ def vault_record(record_id: str, db: Annotated[Session, Depends(get_db)]) -> dic
         "plaintext_returned": False,
         "access_level": "metadata_only",
         "retention_status": "encrypted_bundle_available",
-        "created_at": record.created_at.isoformat() if record.created_at else None,
+        "created_at": to_wib_iso(record.created_at),
     }
 
 
@@ -70,7 +71,7 @@ def government_approve_access_request(
         "request_id": request.request_id,
         "status": request.status,
         "one_time_access_token": token,
-        "expires_at": request.access_token_expires_at.isoformat() if request.access_token_expires_at else None,
+        "expires_at": to_wib_iso(request.access_token_expires_at),
     }
 
 

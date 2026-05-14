@@ -2,7 +2,6 @@ import base64
 import json
 import os
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,7 @@ from app.db.models import SovereignVaultRecord, VaultKey, utc_now
 from app.db.repositories import SovereignVaultRepository, VaultKeyRepository
 from app.services.audit_service import create_audit_log
 from app.utils.hash_utils import sha256_bytes
+from app.utils.time_utils import now_wib_iso, to_wib_iso
 
 settings = get_settings()
 ALGORITHM = "AES-256-GCM + RSA-OAEP-SHA256"
@@ -91,7 +91,7 @@ def serialize_key(key: VaultKey) -> dict[str, Any]:
         "key_id": key.key_id,
         "key_version": key.key_version,
         "public_key_fingerprint": key.public_key_fingerprint,
-        "created_at": key.created_at.isoformat() if key.created_at else None,
+        "created_at": to_wib_iso(key.created_at),
     }
 
 
@@ -114,7 +114,7 @@ def encrypt_original_for_vault(db: Session, record_id: str, upload_session_id: s
         "ciphertext_b64": _b64(ciphertext),
         "original_sha256": sha256_bytes(original_bytes),
         "ciphertext_sha256": sha256_bytes(ciphertext),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now_wib_iso(),
     }
     path = settings.vault_encrypted_original_dir / f"{record_id}.json"
     path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
