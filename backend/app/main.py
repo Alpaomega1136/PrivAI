@@ -2,6 +2,7 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.db.database import get_database_path, init_db
 
 settings = get_settings()
 
@@ -20,6 +21,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+
+
 @app.get("/")
 def root() -> dict[str, str]:
     return {
@@ -31,6 +37,7 @@ def root() -> dict[str, str]:
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
+    database_path = get_database_path()
     return {
         "status": "ok",
         "app": settings.app_name,
@@ -39,4 +46,5 @@ def health() -> dict[str, object]:
         "device": settings.model_device,
         "operational_zone": "ready" if settings.operational_redacted_dir.exists() else "missing",
         "sovereign_vault": "ready" if settings.vault_encrypted_original_dir.exists() else "missing",
+        "database": "ready" if database_path and database_path.exists() else "pending_startup",
     }

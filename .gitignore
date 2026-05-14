@@ -25,3 +25,14 @@ backend/data/*
 # Local outputs
 *.log
 .DS_Store
+
+# Backend runtime storage
+backend/storage/*.db
+backend/storage/**/*.db
+backend/storage/operational_zone/redacted/*
+backend/storage/operational_zone/metadata/*
+backend/storage/sovereign_vault/encrypted_original/*
+backend/storage/sovereign_vault/keys_simulated/*
+backend/storage/config/*
+backend/storage/audit/*
+!backend/storage/**/.gitkeep
