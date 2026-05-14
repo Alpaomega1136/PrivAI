@@ -1,0 +1,94 @@
+﻿version: 1
+schema_version: "1.0"
+
+detection:
+  model_path: "/app/models/model_deteksi.pt"
+  device: "cpu"
+  confidence_threshold: 0.5
+  iou_threshold: 0.45
+  classes:
+    - name: KTP
+      risk_level: critical
+      redact: true
+      weight: 25
+    - name: SIM
+      risk_level: critical
+      redact: true
+      weight: 25
+    - name: Paspor
+      risk_level: critical
+      redact: true
+      weight: 25
+    - name: NIK_Teks
+      risk_level: critical
+      redact: true
+      weight: 30
+    - name: Wajah
+      risk_level: high
+      redact: true
+      weight: 15
+    - name: Plat_Nomor
+      risk_level: medium
+      redact: true
+      weight: 10
+
+redaction:
+  default_type: blur
+  types:
+    blur:
+      kernel_size: 35
+      sigma: 15
+    pixelate:
+      block_size: 20
+    blackbox:
+      color: [0, 0, 0]
+  per_class_override: {}
+  padding_pixels: 5
+
+risk:
+  algorithm: weighted_sum
+  thresholds:
+    safe: 25
+    waspada: 50
+    berisiko: 75
+    kritis: 100
+  rules:
+    - name: class_weight
+      enabled: true
+    - name: count_multiplier
+      enabled: true
+      multiplier: 1.2
+
+audit:
+  enabled: true
+  fields:
+    - timestamp
+    - trace_id
+    - action
+    - actor
+    - resource_id
+    - metadata
+  format: json
+  retention_days: 90
+
+storage:
+  metadata_backend: sqlite
+  metadata_path: "/app/data/privai.db"
+  vault_backend: filesystem
+  vault_path: "/app/data/sovereign-vault"
+  public_backend: filesystem
+  public_path: "/app/data/public-redacted"
+
+features:
+  virtual_camera: true
+  privacy_score: true
+  recording: true
+  demo_presets: true
+  websocket_streaming: true
+
+plugins:
+  detectors_dir: "/app/app/plugins/detectors"
+  validators_dir: "/app/app/plugins/validators"
+  preprocessors_dir: "/app/app/plugins/preprocessors"
+  postprocessors_dir: "/app/app/plugins/postprocessors"
+  autoload: true
