@@ -1,8 +1,12 @@
-﻿from fastapi import FastAPI
+﻿from typing import Annotated
+
+from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.database import get_database_path, init_db
+from app.db.database import get_database_path, get_db, init_db
+from app.services.audit_service import list_audit_logs
 
 settings = get_settings()
 
@@ -47,4 +51,31 @@ def health() -> dict[str, object]:
         "operational_zone": "ready" if settings.operational_redacted_dir.exists() else "missing",
         "sovereign_vault": "ready" if settings.vault_encrypted_original_dir.exists() else "missing",
         "database": "ready" if database_path and database_path.exists() else "pending_startup",
+    }
+
+
+@app.get("/api/audit-logs")
+def get_audit_logs(
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    record_id: str | None = None,
+    zone: str | None = None,
+    event_type: str | None = None,
+) -> dict[str, object]:
+    logs = list_audit_logs(
+        db=db,
+        limit=limit,
+        record_id=record_id,
+        zone=zone,
+        event_type=event_type,
+    )
+    return {
+        "logs": logs,
+        "count": len(logs),
+        "filters": {
+            "limit": limit,
+            "record_id": record_id,
+            "zone": zone,
+            "event_type": event_type,
+        },
     }
