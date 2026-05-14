@@ -426,38 +426,6 @@ input:focus, select:focus {
   min-height: auto;
 }
 .text-button:hover { background: rgba(26, 32, 44, 0.08); transform: none; }
-.class-toggle-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
-}
-.class-toggle-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--muted);
-  border-radius: 12px;
-  background: var(--surface-strong);
-  color: var(--text);
-  text-align: left;
-  box-shadow: none;
-}
-.class-toggle-card strong { font-size: 13px; color: var(--text); }
-.class-toggle-card small {
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.class-toggle-card.active {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--surface);
-}
 .class-toggle-card.active strong,
 .class-toggle-card.active small { color: var(--surface); }
 
@@ -2783,40 +2751,93 @@ tr:last-child td { border-bottom: none; }
   object-fit: contain;
 }
 
-/* Mode switch (used in both shells) */
+/* Mode switch (used in both shells) — pill-shaped to match the logo strips
+   and the Refresh button (border-radius: 999px) for a consistent control row. */
 .mode-switch {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
   color: var(--muted);
   font-weight: 600;
 }
-.mode-switch-label { white-space: nowrap; }
+.mode-switch-label {
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
 .mode-switch-control {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
-.mode-switch-control select {
-  appearance: none;
-  -webkit-appearance: none;
+.mode-switch-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.04em;
-  padding: 8px 32px 8px 14px;
+  padding: 10px 16px 10px 18px;
   cursor: pointer;
+  box-shadow: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.mode-switch-control svg {
-  position: absolute;
-  right: 10px;
-  pointer-events: none;
+.mode-switch-trigger:hover,
+.mode-switch-trigger.is-open {
+  border-color: var(--text);
+}
+.mode-switch-trigger:focus-visible {
+  outline: none;
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
+}
+.mode-switch-trigger svg {
   color: var(--muted);
+  transition: transform 0.18s ease, color 0.18s ease;
 }
+.mode-switch-trigger:hover svg,
+.mode-switch-trigger.is-open svg { color: var(--text); }
+.mode-switch-trigger.is-open svg { transform: rotate(180deg); }
+
+/* Styled option list — replaces the un-stylable native <select> popup. */
+.mode-switch-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+  z-index: 40;
+}
+.mode-switch-option {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.mode-switch-option:hover { background: var(--surface-strong); color: var(--text); }
+.mode-switch-option.active { background: var(--primary); color: var(--surface); }
 
 /* ============================================================
    User shell
@@ -3597,4 +3618,27 @@ tr:last-child td { border-bottom: none; }
 /* Brand logo image inside shells */
 .user-brand-logo { height: 62px; width: auto; object-fit: contain; display: block; }
 
+
+
+/* Dynamic Threshold Animation */
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animated-threshold-item {
+  animation: fadeSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+.class-toggle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+/* Scoped with .class-toggle-grid so these win over the global ".form-stack button"
+   rule — otherwise inactive cards inside a form-stack (Government view) turn black. */
+.class-toggle-grid .class-toggle-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); text-align: left; box-shadow: none; }
+.class-toggle-grid .class-toggle-card strong { font-size: 13px; color: var(--text); }
+.class-toggle-grid .class-toggle-card small { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.class-toggle-grid .class-toggle-card.active { border-color: var(--primary); background: var(--primary); color: var(--surface); }
+.class-toggle-grid .class-toggle-card.active strong,
+.class-toggle-grid .class-toggle-card.active small { color: var(--surface); }
+/* Same specificity fix for the toolbar buttons (Pilih Semua / Kosongkan). */
+.class-toggle-toolbar .text-button { background: transparent; color: var(--primary); box-shadow: none; }
 

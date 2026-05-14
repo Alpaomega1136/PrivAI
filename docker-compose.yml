@@ -1,43 +1,53 @@
-﻿services:
+# PrivAI — full stack (FastAPI backend + Vite/nginx frontend).
+#   docker compose up --build      → build + run
+#   open http://localhost:5173     → app
+#   open http://localhost:8000/docs → backend API docs
+#
+# Override defaults by copying .env.example to .env (same folder as this file).
+
+services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: privai-backend
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      MODEL_PATH: ${MODEL_PATH:-/app/models/model_deteksi.pt}
-      CONFIG_PATH: ${CONFIG_PATH:-/app/config/runtime.yaml}
-      DATA_DIR: ${DATA_DIR:-/app/data}
+      # Path of the trained YOLO model inside the image (baked in by the Dockerfile).
+      MODEL_PATH: /app/models/model_deteksi.pt
+      MODEL_DEVICE: ${MODEL_DEVICE:-cpu}
+      # Browsers talk to the frontend origin; CORS is mostly a safety net here.
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      GOVERNMENT_TOKEN: ${GOVERNMENT_TOKEN:-privai-government-demo-token}
+      APPROVER_TOKEN: ${APPROVER_TOKEN:-privai-approver-demo-token}
+      CRYPTO_ADMIN_TOKEN: ${CRYPTO_ADMIN_TOKEN:-privai-crypto-admin-demo-token}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./config:/app/config:ro
-      - ./backend/models:/app/models:ro
-      - ./backend/data:/app/data
+      # Persists SQLite DB, Sovereign Vault, Operational Zone, runtime policy.
+      - privai-storage:/app/storage
+      # Caches EasyOCR models so they are not re-downloaded on every recreate.
+      - privai-easyocr:/root/.EasyOCR
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
       interval: 30s
       timeout: 5s
-      retries: 3
-      start_period: 20s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: privai-frontend
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+      # Host port -> nginx port 80 inside the container.
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
-  frontend_node_modules:
+  privai-storage:
+  privai-easyocr:

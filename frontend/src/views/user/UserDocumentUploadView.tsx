@@ -221,7 +221,6 @@ export function UserDocumentUploadView({
                       options={availableClasses}
                       selected={activeClasses}
                       onChange={setActiveClasses}
-                      helper="Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes."
                     />
                   </Field>
 

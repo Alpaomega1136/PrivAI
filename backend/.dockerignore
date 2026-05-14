@@ -1,9 +1,20 @@
-﻿__pycache__/
-*.pyc
+# Keep the build context small + reproducible.
 .venv/
 venv/
-data/*
-!data/.gitkeep
-!data/public-redacted/.gitkeep
-!data/sovereign-vault/.gitkeep
+__pycache__/
+**/__pycache__/
+*.pyc
 *.log
+
+# Local runtime state — recreated inside the container / persisted via volume.
+storage/
+data/
+
+# Not needed at runtime.
+datasets/
+certs/
+alembic/
+tests/
+.env
+.env.*
+!.env.example

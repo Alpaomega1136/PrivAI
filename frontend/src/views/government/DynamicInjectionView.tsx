@@ -147,7 +147,6 @@ export function DynamicInjectionView({
             <ClassSelectionGrid
               options={availableClasses}
               selected={activeClassesList}
-              helper="Yang dipilih menjadi active_classes. Yang tidak dipilih otomatis menjadi disabled_classes."
               onChange={(newSelected) => {
                 setPolicy((current) => ({
                   ...current,
@@ -157,25 +156,27 @@ export function DynamicInjectionView({
               }}
             />
           </Field>
-          <div className="policy-class-summary">
-            <span>Aktif: {activeClassesList.length ? activeClassesList.join(", ") : "Tidak ada"}</span>
-            <span>Nonaktif: {disabledClassesList.length ? disabledClassesList.join(", ") : "Tidak ada"}</span>
-          </div>
 
           <Field label="Confidence Threshold per Kelas">
             <div className="form-grid">
-              {availableClasses.map((className) => (
-                <Field key={className} label={className}>
-                  <NumericInput
-                    min={0.01}
-                    max={0.99}
-                    step={0.01}
-                    value={classConfidence[className]}
-                    fallbackValue={DEFAULT_CLASS_CONFIDENCE[className]}
-                    onValueChange={(value) => updateClassConfidence(className, value)}
-                  />
-                </Field>
-              ))}
+              {activeClassesList.length === 0 ? (
+                <div className="empty-state" style={{ gridColumn: "1 / -1" }}>Tidak ada kelas yang diaktifkan.</div>
+              ) : (
+                activeClassesList.map((className) => (
+                  <div key={className} className="animated-threshold-item">
+                    <Field label={className}>
+                      <NumericInput
+                        min={0.01}
+                        max={0.99}
+                        step={0.01}
+                        value={classConfidence[className]}
+                        fallbackValue={DEFAULT_CLASS_CONFIDENCE[className]}
+                        onValueChange={(value) => updateClassConfidence(className, value)}
+                      />
+                    </Field>
+                  </div>
+                ))
+              )}
             </div>
             <small className="field-hint">
               Threshold deteksi per kelas, dikalibrasi dari kurva F1/PR. Kelas tanpa nilai pakai Confidence Threshold
