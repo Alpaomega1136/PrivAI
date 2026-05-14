@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   Building2,
   Cpu,
@@ -24,6 +24,7 @@ import {
   createGovernmentAccessRequest,
   downloadGovernmentOriginal,
   getApiBaseUrl,
+  getApiBaseCandidates,
   getAuditLogs,
   getCryptoKeyInfo,
   getGovernmentAccessRequest,
@@ -127,6 +128,7 @@ export default function App() {
           <div>
             <p className="eyebrow">API Base</p>
             <h1>{getApiBaseUrl()}</h1>
+            <small className="api-hint">Fallback candidates: {getApiBaseCandidates().join(" | ")}</small>
           </div>
           <button className="primary-button" onClick={refreshDashboard} disabled={isLoading}>
             <RefreshCw className={isLoading ? "spin" : ""} size={17} />
@@ -224,7 +226,7 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
     if (nextResult.ok) await onRefresh();
   }
 
-  const redactedUrl = buildBackendFileUrl(String(result.data?.operational_zone && typeof result.data.operational_zone === "object" && "redacted_file" in result.data.operational_zone ? "" : ""));
+  const redactedUrl = buildBackendFileUrl(readNestedString(result.data, ["operational_zone", "redacted_file", "url"]));
 
   return (
     <div className="view-stack">
@@ -302,6 +304,10 @@ function GovernmentAccess({ latestRecordId }: { latestRecordId: string }) {
   const [approverToken, setApproverToken] = useState("privai-approver-demo-token");
   const [result, setResult] = useState<ApiResult<Record<string, unknown>>>(emptyResult());
 
+  useEffect(() => {
+    if (latestRecordId && !recordId) setRecordId(latestRecordId);
+  }, [latestRecordId, recordId]);
+
   async function createRequest() {
     const response = await safeRequest(() => createGovernmentAccessRequest({ recordId, requester: "Dukcapil Officer", requesterRole: "verifier", reason: "Demo controlled original access", governmentToken }));
     setResult(response);
@@ -357,6 +363,23 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
     setPolicy((current) => ({ ...current, [key]: value }));
   }
 
+  async function loadPolicy() {
+    const response = await safeRequest(getRuntimePolicy);
+    setResult(response);
+    if (response.ok && response.data?.policy && typeof response.data.policy === "object") {
+      setPolicy(response.data.policy);
+    }
+  }
+
+  async function resetPolicy() {
+    const response = await safeRequest(resetRuntimePolicy);
+    setResult(response);
+    if (response.ok && response.data?.policy && typeof response.data.policy === "object") {
+      setPolicy(response.data.policy);
+    }
+    await onRefresh();
+  }
+
   return (
     <div className="view-stack">
       <SectionTitle eyebrow="Dynamic Injection" title="Runtime policy editor" subtitle="Target backend: validated runtime config only. No eval, no arbitrary code execution." icon={<SlidersHorizontal />} />
@@ -371,7 +394,7 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
           <Field label="Active classes CSV"><input value={(policy.active_classes as string[] | undefined)?.join(",") ?? ""} onChange={(e) => updateField("active_classes", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} /></Field>
           <Field label="Disabled classes CSV"><input value={(policy.disabled_classes as string[] | undefined)?.join(",") ?? ""} onChange={(e) => updateField("disabled_classes", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} /></Field>
           <Field label="Injection note"><input value={String(policy.injection_note ?? "")} onChange={(e) => updateField("injection_note", e.target.value)} /></Field>
-          <div className="button-row"><button onClick={async () => setResult(await safeRequest(getRuntimePolicy))}>Load</button><button onClick={async () => { setResult(await safeRequest(() => updateRuntimePolicy(policy))); await onRefresh(); }}>Save</button><button onClick={async () => { setResult(await safeRequest(resetRuntimePolicy)); await onRefresh(); }}>Reset</button></div>
+          <div className="button-row"><button onClick={loadPolicy}>Load</button><button onClick={async () => { const response = await safeRequest(() => updateRuntimePolicy(policy)); setResult(response); if (response.ok && response.data?.policy && typeof response.data.policy === "object") setPolicy(response.data.policy); await onRefresh(); }}>Save</button><button onClick={resetPolicy}>Reset</button></div>
         </Panel>
         <Panel title="Runtime response" eyebrow="Dynamic Injection Result" icon={<ShieldCheck />}><ResultBox result={result} /><JsonBlock data={policy} /></Panel>
       </section>
@@ -382,6 +405,11 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
 function AuditLogView({ initialLogs }: { initialLogs: ApiResult<{ logs: AuditLog[]; count: number }> }) {
   const [filters, setFilters] = useState<Required<Pick<AuditLogFilters, "limit" | "recordId" | "zone" | "eventType">>>({ limit: 50, recordId: "", zone: "", eventType: "" });
   const [result, setResult] = useState(initialLogs);
+
+  useEffect(() => {
+    setResult(initialLogs);
+  }, [initialLogs]);
+
   return (
     <div className="view-stack">
       <SectionTitle eyebrow="Audit Log" title="Security event trace" subtitle="Target backend: GET /api/audit-logs with limit, record_id, zone, event_type." icon={<Activity />} />
@@ -430,6 +458,15 @@ function ResultBox<T>({ result }: { result: ApiResult<T> }) {
 
 function JsonBlock({ data }: { data: unknown }) {
   return <pre className="json-block">{JSON.stringify(data ?? null, null, 2)}</pre>;
+}
+
+function readNestedString(source: unknown, path: string[]) {
+  let current: unknown = source;
+  for (const key of path) {
+    if (!current || typeof current !== "object" || !(key in current)) return "";
+    current = (current as Record<string, unknown>)[key];
+  }
+  return typeof current === "string" ? current : "";
 }
 
 function statusText(error?: ApiError) {

@@ -1,20 +1,17 @@
-﻿from typing import Annotated
-
-from fastapi import Depends, FastAPI, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 
-from app.ai.class_map import CANONICAL_CLASSES, serialize_classes
+from app.api import audit, crypto, government, redaction, runtime, storage, system
 from app.core.config import get_settings
-from app.core.redaction_policy import ALLOWED_REDACTION_MODES, serialize_redaction_profiles
-from app.db.database import get_database_path, get_db, init_db
-from app.services.audit_service import list_audit_logs
+from app.db.database import init_db, session_scope
+from app.services.vault_service import ensure_active_vault_key
+from app.ai.runtime import detector
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="1.0.0",
     description="Government-first local visual privacy firewall API.",
 )
 
@@ -30,64 +27,21 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
+    with session_scope() as db:
+        ensure_active_vault_key(db)
+    detector.load_in_background()
 
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {
-        "app": settings.app_name,
-        "docs": "/docs",
-        "health": "/api/health",
-    }
+    return {"app": settings.app_name, "docs": "/docs", "health": "/api/health"}
 
 
-@app.get("/api/health")
-def health() -> dict[str, object]:
-    database_path = get_database_path()
-    return {
-        "status": "ok",
-        "app": settings.app_name,
-        "model_loaded": False,
-        "model_exists": settings.model_exists,
-        "device": settings.model_device,
-        "operational_zone": "ready" if settings.operational_redacted_dir.exists() else "missing",
-        "sovereign_vault": "ready" if settings.vault_encrypted_original_dir.exists() else "missing",
-        "database": "ready" if database_path and database_path.exists() else "pending_startup",
-    }
+app.include_router(system.router, prefix="/api")
+app.include_router(redaction.router, prefix="/api")
+app.include_router(storage.router, prefix="/api")
+app.include_router(crypto.router, prefix="/api")
+app.include_router(runtime.router, prefix="/api")
+app.include_router(government.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 
-
-@app.get("/api/redaction-config")
-def get_redaction_config() -> dict[str, object]:
-    return {
-        "profiles": serialize_redaction_profiles(),
-        "allowed_modes": ALLOWED_REDACTION_MODES,
-        "classes": serialize_classes(),
-        "canonical_classes": CANONICAL_CLASSES,
-    }
-
-
-@app.get("/api/audit-logs")
-def get_audit_logs(
-    db: Annotated[Session, Depends(get_db)],
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    record_id: str | None = None,
-    zone: str | None = None,
-    event_type: str | None = None,
-) -> dict[str, object]:
-    logs = list_audit_logs(
-        db=db,
-        limit=limit,
-        record_id=record_id,
-        zone=zone,
-        event_type=event_type,
-    )
-    return {
-        "logs": logs,
-        "count": len(logs),
-        "filters": {
-            "limit": limit,
-            "record_id": record_id,
-            "zone": zone,
-            "event_type": event_type,
-        },
-    }

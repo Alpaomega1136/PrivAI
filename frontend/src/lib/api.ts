@@ -1,4 +1,15 @@
-﻿const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").trim();
+const defaultApiBaseUrl = configuredApiBaseUrl || "";
+const fallbackApiBaseUrls = [
+  defaultApiBaseUrl,
+  "",
+  "http://127.0.0.1:8010",
+  "http://localhost:8010",
+  "http://127.0.0.1:8000",
+  "http://localhost:8000",
+];
+
+let activeApiBaseUrl = defaultApiBaseUrl;
 
 export type ApiError = {
   status: number;
@@ -17,6 +28,7 @@ export type HealthResponse = {
   app: string;
   model_loaded: boolean;
   model_exists: boolean;
+  model_loading?: boolean;
   device: string;
   operational_zone: string;
   sovereign_vault: string;
@@ -86,6 +98,14 @@ export type RedactImageInput = {
   ttaAngles?: string;
 };
 
+function normalizeBaseUrl(value: string) {
+  return value.replace(/\/$/, "");
+}
+
+function candidateApiBaseUrls() {
+  return Array.from(new Set([activeApiBaseUrl, ...fallbackApiBaseUrls].map(normalizeBaseUrl)));
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   let detail: unknown = undefined;
   try {
@@ -100,12 +120,67 @@ async function parseError(response: Response): Promise<ApiError> {
   };
 }
 
+function shouldTryNextBase(error: ApiError) {
+  return error.status === 0 || error.status === 404;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, init);
-  if (!response.ok) {
-    throw await parseError(response);
+  let lastError: ApiError | null = null;
+  for (const baseUrl of candidateApiBaseUrls()) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, init);
+      if (response.ok) {
+        const data = (await response.json()) as T;
+        if (
+          path === "/api/health" &&
+          data &&
+          typeof data === "object" &&
+          !("model_loading" in data) &&
+          candidateApiBaseUrls().length > 1
+        ) {
+          lastError = {
+            status: 404,
+            message: `${baseUrl}${path} is an older backend instance`,
+            detail: data,
+          };
+          continue;
+        }
+        activeApiBaseUrl = baseUrl;
+        return data;
+      }
+      lastError = await parseError(response);
+      if (!shouldTryNextBase(lastError)) break;
+    } catch (error) {
+      lastError = {
+        status: 0,
+        message: error instanceof Error ? error.message : "Network request failed",
+        detail: error,
+      };
+    }
   }
-  return response.json() as Promise<T>;
+  throw lastError ?? { status: 0, message: "No API base URL reachable" };
+}
+
+async function requestBlob(path: string, init?: RequestInit) {
+  let lastError: ApiError | null = null;
+  for (const baseUrl of candidateApiBaseUrls()) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, init);
+      if (response.ok) {
+        activeApiBaseUrl = baseUrl;
+        return response;
+      }
+      lastError = await parseError(response);
+      if (!shouldTryNextBase(lastError)) break;
+    } catch (error) {
+      lastError = {
+        status: 0,
+        message: error instanceof Error ? error.message : "Network request failed",
+        detail: error,
+      };
+    }
+  }
+  throw lastError ?? { status: 0, message: "No API base URL reachable" };
 }
 
 export async function safeRequest<T>(request: () => Promise<T>): Promise<ApiResult<T>> {
@@ -131,13 +206,17 @@ function withParams(path: string, params: URLSearchParams) {
 }
 
 export function getApiBaseUrl() {
-  return apiBaseUrl;
+  return activeApiBaseUrl || "same-origin /api proxy";
+}
+
+export function getApiBaseCandidates() {
+  return candidateApiBaseUrls().map((baseUrl) => baseUrl || "same-origin /api proxy");
 }
 
 export function buildBackendFileUrl(relativeUrl?: string) {
   if (!relativeUrl) return "";
   if (relativeUrl.startsWith("http://") || relativeUrl.startsWith("https://")) return relativeUrl;
-  return `${apiBaseUrl}${relativeUrl}`;
+  return `${activeApiBaseUrl}${relativeUrl}`;
 }
 
 export function getHealth() {
@@ -247,11 +326,10 @@ export async function downloadGovernmentOriginal(input: {
 }) {
   const params = new URLSearchParams();
   params.set("access_token", input.accessToken);
-  const response = await fetch(
-    `${apiBaseUrl}${withParams(`/api/government/access-requests/${encodeURIComponent(input.requestId)}/secure-original`, params)}`,
+  const response = await requestBlob(
+    withParams(`/api/government/access-requests/${encodeURIComponent(input.requestId)}/secure-original`, params),
     { headers: { "X-Government-Token": input.governmentToken } },
   );
-  if (!response.ok) throw await parseError(response);
   const blob = await response.blob();
   const filename = response.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1] || "privai-original.bin";
   return { blob, filename };

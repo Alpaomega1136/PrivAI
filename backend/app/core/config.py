@@ -1,4 +1,4 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 from pathlib import Path
 from typing import List
 
@@ -73,8 +73,15 @@ class Settings(BaseSettings):
         return self.storage_root / "audit"
 
     @property
+    def effective_model_path(self) -> Path:
+        if self.model_path.exists():
+            return self.model_path
+        fallback = BACKEND_ROOT / "models" / "model_deteksi.pt"
+        return fallback if fallback.exists() else self.model_path
+
+    @property
     def model_exists(self) -> bool:
-        return self.model_path.exists()
+        return self.effective_model_path.exists()
 
 
 def ensure_storage_directories(settings: Settings) -> None:
