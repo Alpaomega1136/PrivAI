@@ -1,23 +1,18 @@
-import { Copy, EyeOff, FileText, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
+import { Copy, EyeOff, FileText, LockKeyhole, RefreshCw, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
 
 import { ClassSelectionGrid } from "../../components/ui/ClassSelectionGrid";
 import { Collapsible } from "../../components/ui/Collapsible";
 import { Field } from "../../components/ui/Field";
 import { JsonBlock } from "../../components/ui/JsonBlock";
-import { Panel } from "../../components/ui/Panel";
 import { ApiResult, RedactionConfigResponse, buildBackendFileUrl, redactImage, safeRequest } from "../../lib/api";
 import { PERFORMANCE_MODES, PRIVACY_CLASSES } from "../../lib/constants";
 import { formatMs, readNestedString } from "../../lib/format";
 import { getDisabledPrivacyClasses } from "../../lib/policy";
 
-// ╔═══ ASSET PAGE INI — ubah di sini ═══╗
-// Taruh file di src/assets/ lalu uncomment import & isi nama file.
-// import banner from "../../assets/upload-banner.png";
 const PAGE_ASSETS = {
-  banner: "" as string, // banner gambar di atas halaman; "" = tidak ditampilkan
+  banner: "" as string,
 };
-// ╚══════════════════════════════════════╝
 
 export function UserDocumentUploadView({
   redactionConfig,
@@ -157,95 +152,113 @@ export function UserDocumentUploadView({
     : [];
 
   return (
-    <div className="view-stack">
+    <div className="view-stack user-upload-page">
       {PAGE_ASSETS.banner && <img className="page-banner" src={PAGE_ASSETS.banner} alt="" />}
-      <div className="two-column">
-        <Panel title="Upload Dokumen" eyebrow="Document Privacy Shield" icon={<FileText />}>
-          <form className="form-stack" onSubmit={submit}>
+
+      <form className="user-upload-form" onSubmit={submit}>
+        <div className="upload-workbench">
+          <section className="upload-viewer-card upload-source-card">
+            <div className="upload-card-header">
+              <div>
+                <p className="eyebrow">Document Privacy Shield</p>
+                <h3>Original Document</h3>
+              </div>
+              <details className="upload-settings-dropdown">
+                <summary>
+                  <SlidersHorizontal size={16} /> Settings
+                </summary>
+                <div className="upload-settings-menu">
+                  <div className="form-grid compact-form-grid">
+                    <Field label={`Confidence (${confidenceThreshold})`}>
+                      <input
+                        type="range"
+                        min="0.01"
+                        max="0.99"
+                        step="0.01"
+                        value={confidenceThreshold}
+                        onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                      />
+                    </Field>
+                    <Field label="Performance Mode">
+                      <select value={performanceMode} onChange={(e) => setPerformanceMode(e.target.value)}>
+                        {PERFORMANCE_MODES.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="field-hint">{selectedPerformanceMode.description}</small>
+                    </Field>
+                    <Field label="Profile">
+                      <select value={profile} onChange={(e) => setProfile(e.target.value)}>
+                        {Object.keys(redactionConfig?.profiles ?? { government: null, live_webcam: null }).map((item) => (
+                          <option key={item}>{item}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Redaction Mode">
+                      <select value={redactionMode} onChange={(e) => setRedactionMode(e.target.value)}>
+                        <option value="default">default</option>
+                        {(redactionConfig?.allowed_modes ?? ["black_box", "blur", "pixelate"]).map((item) => (
+                          <option key={item}>{item}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+
+                  <Field label="Target Kelas Aktif">
+                    <ClassSelectionGrid
+                      options={availableClasses}
+                      selected={activeClasses}
+                      onChange={setActiveClasses}
+                      helper={<span style={{ color: "transparent" }}>Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes.</span>}
+                    />
+                  </Field>
+
+                  <div className="inline-form upload-settings-checks">
+                    <label className="checkbox-line">
+                      <input
+                        type="checkbox"
+                        checked={useRuntimePolicy}
+                        onChange={(e) => setUseRuntimePolicy(e.target.checked)}
+                      />{" "}
+                      Gunakan Dynamic Policy
+                    </label>
+                    <label className="checkbox-line">
+                      <input
+                        type="checkbox"
+                        checked={authenticityOcr}
+                        disabled={performanceMode !== "robust"}
+                        onChange={(e) => setAuthenticityOcr(e.target.checked)}
+                      />{" "}
+                      OCR detail KTP
+                    </label>
+                  </div>
+                </div>
+              </details>
+            </div>
+
             <label
-              className={`file-drop${isDraggingFile ? " is-dragging" : ""}${file ? " has-file" : ""}`}
+              className={`document-drop-zone${isDraggingFile ? " is-dragging" : ""}${file ? " has-file" : ""}`}
               onDragEnter={onFileDragEnter}
               onDragOver={onFileDrag}
               onDragLeave={onFileDragLeave}
               onDrop={onFileDrop}
             >
               <input type="file" accept="image/*" onChange={onFileChange} />
-              <FileText size={32} color="var(--primary)" />
-              <span>{file ? file.name : "Drag & drop atau pilih gambar"}</span>
-              <small>
-                {isDraggingFile ? "Lepaskan gambar di area ini" : "Mendukung format gambar standar (JPG, PNG, WEBP)"}
-              </small>
+              {preview ? (
+                <img src={preview} alt="Original document preview" />
+              ) : (
+                <div className="document-drop-empty">
+                  <FileText size={42} />
+                  <strong>Drag & drop dokumen di sini</strong>
+                  <span>atau klik untuk memilih gambar JPG, PNG, atau WEBP</span>
+                </div>
+              )}
             </label>
             {fileError && <div className="field-warning">{fileError}</div>}
 
-            <div className="form-grid">
-              <Field label={`Confidence (${confidenceThreshold})`}>
-                <input
-                  type="range"
-                  min="0.01"
-                  max="0.99"
-                  step="0.01"
-                  value={confidenceThreshold}
-                  onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Performance Mode">
-                <select value={performanceMode} onChange={(e) => setPerformanceMode(e.target.value)}>
-                  {PERFORMANCE_MODES.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-                <small className="field-hint">{selectedPerformanceMode.description}</small>
-              </Field>
-              <Field label="Profile">
-                <select value={profile} onChange={(e) => setProfile(e.target.value)}>
-                  {Object.keys(redactionConfig?.profiles ?? { government: null, live_webcam: null }).map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Redaction Mode">
-                <select value={redactionMode} onChange={(e) => setRedactionMode(e.target.value)}>
-                  <option value="default">default</option>
-                  {(redactionConfig?.allowed_modes ?? ["black_box", "blur", "pixelate"]).map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            <Field label="Target Kelas Aktif">
-              <ClassSelectionGrid
-                options={availableClasses}
-                selected={activeClasses}
-                onChange={setActiveClasses}
-                helper="Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes."
-              />
-            </Field>
-
-            <div className="inline-form">
-              <label className="checkbox-line">
-                <input
-                  type="checkbox"
-                  checked={useRuntimePolicy}
-                  onChange={(e) => setUseRuntimePolicy(e.target.checked)}
-                />{" "}
-                Gunakan Dynamic Policy
-              </label>
-              <label className="checkbox-line">
-                <input
-                  type="checkbox"
-                  checked={authenticityOcr}
-                  disabled={performanceMode !== "robust"}
-                  onChange={(e) => setAuthenticityOcr(e.target.checked)}
-                />{" "}
-                OCR detail KTP
-              </label>
-            </div>
-
-            <button className="primary-button" disabled={!file || isSubmitting}>
+            <button className="primary-button user-run-redaction" disabled={!file || isSubmitting}>
               {isSubmitting ? (
                 <>
                   <RefreshCw className="spin" size={16} /> Memproses...
@@ -254,127 +267,130 @@ export function UserDocumentUploadView({
                 "Jalankan Redaksi"
               )}
             </button>
-          </form>
-        </Panel>
+          </section>
 
-        <Panel title="Hasil Redaksi" eyebrow="Preview" icon={<EyeOff />}>
-          <div className="preview-grid">
-            <div className="preview-card">
-              <span>Original</span>
-              {preview ? <img src={preview} alt="Original" /> : <div className="empty-state">Belum ada gambar</div>}
+          <section className="upload-viewer-card upload-result-card">
+            <div className="upload-card-header">
+              <div>
+                <p className="eyebrow">Preview</p>
+                <h3>Hasil Redaksi</h3>
+              </div>
+              <EyeOff size={22} />
             </div>
-            <div className="preview-card">
-              <span>Redacted</span>
+            <div className={`redacted-viewer${redactedUrl ? " has-file" : ""}`}>
               {redactedUrl ? (
-                <img src={redactedUrl} alt="Redacted" />
+                <img src={redactedUrl} alt="Redacted document preview" />
               ) : (
-                <div className="empty-state">Hasil redaksi akan tampil di sini</div>
+                <div className="document-drop-empty muted-empty">
+                  <EyeOff size={42} />
+                  <strong>Hasil redaksi akan tampil di sini</strong>
+                  <span>PrivAI akan menampilkan output aman setelah proses selesai.</span>
+                </div>
               )}
+            </div>
+          </section>
+        </div>
+      </form>
+
+      {result?.ok && (
+        <div className="result-box success-box upload-result-summary">
+          <div className="meta-row">
+            <div className="meta-item">
+              <span>Record ID</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <strong>{recordId}</strong>
+                <button
+                  className="copy-button"
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(recordId)}
+                  title="Copy ID"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="meta-item">
+              <span>Total Latency</span>
+              <strong>{formatMs(latency)}</strong>
+              <small>Detector: {formatMs(detectorLatency)}</small>
+            </div>
+            <div className="meta-item">
+              <span>Deteksi</span>
+              <strong>{detectionCount} objek</strong>
+            </div>
+            <div className="meta-item">
+              <span>Diredaksi</span>
+              <strong>{redactedCount} area</strong>
+            </div>
+            <div className="meta-item">
+              <span>Ditolak Guardrail</span>
+              <strong>{rejectedCount} objek</strong>
             </div>
           </div>
 
-          {result?.ok && (
-            <div className="result-box success-box">
-              <div className="meta-row">
-                <div className="meta-item">
-                  <span>Record ID</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <strong>{recordId}</strong>
-                    <button
-                      className="copy-button"
-                      type="button"
-                      onClick={() => navigator.clipboard.writeText(recordId)}
-                      title="Copy ID"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
+          {timingItems.length > 0 && (
+            <div className="timing-grid">
+              {timingItems.map(([label, value]) => (
+                <div className="timing-card" key={String(label)}>
+                  <span>{String(label)}</span>
+                  <strong>{formatMs(value)}</strong>
                 </div>
-                <div className="meta-item">
-                  <span>Total Latency</span>
-                  <strong>{formatMs(latency)}</strong>
-                  <small>Detector: {formatMs(detectorLatency)}</small>
-                </div>
-                <div className="meta-item">
-                  <span>Deteksi</span>
-                  <strong>{detectionCount} objek</strong>
-                </div>
-                <div className="meta-item">
-                  <span>Diredaksi</span>
-                  <strong>{redactedCount} area</strong>
-                </div>
-                <div className="meta-item">
-                  <span>Ditolak Guardrail</span>
-                  <strong>{rejectedCount} objek</strong>
-                </div>
-              </div>
-              {timingItems.length > 0 && (
-                <div className="timing-grid">
-                  {timingItems.map(([label, value]) => (
-                    <div className="timing-card" key={String(label)}>
-                      <span>{String(label)}</span>
-                      <strong>{formatMs(value)}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
-                {(result.data?.detections as Array<Record<string, unknown>>)?.map((d, i) => (
-                  <div
-                    key={i}
-                    className={`badge ${String(d.guardrail_action) === "skip_redaction" ? "danger" : "copper"}`}
-                  >
-                    {String(d.class_name)} {(Number(d.confidence) * 100).toFixed(0)}%
-                    {d.validation_status ? ` - ${String(d.validation_status)}` : ""}
-                  </div>
-                ))}
-              </div>
-              {rejectedCount > 0 && (
-                <div className="alert-card warning" style={{ marginBottom: 0 }}>
-                  <ShieldCheck size={24} color="var(--warning)" />
-                  <div>
-                    <strong>Guardrail menolak {rejectedCount} kandidat</strong>
-                    <p>
-                      Deteksi yang dicurigai sebagai gambar tangan/sketsa atau tidak punya bukti dokumen resmi tidak
-                      ikut diredaksi pada mode precision demo.
-                    </p>
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
           )}
 
-          {result && !result.ok && (
-            <div className="alert-card warning">
-              <ShieldCheck size={24} color="var(--danger)" />
-              <div>
-                <strong>Gagal Memproses Dokumen</strong>
-                <p>{result.error?.message || "Terjadi kesalahan pada sistem."}</p>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+            {(result.data?.detections as Array<Record<string, unknown>>)?.map((d, i) => (
+              <div key={i} className={`badge ${String(d.guardrail_action) === "skip_redaction" ? "danger" : "copper"}`}>
+                {String(d.class_name)} {(Number(d.confidence) * 100).toFixed(0)}%
+                {d.validation_status ? ` - ${String(d.validation_status)}` : ""}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
 
-          {result?.ok && (
-            <div className="alert-card success">
-              <LockKeyhole size={24} color="var(--success)" />
+          {rejectedCount > 0 && (
+            <div className="alert-card warning" style={{ marginBottom: 0 }}>
+              <ShieldCheck size={24} color="var(--warning)" />
               <div>
-                <strong>Output aman tersimpan</strong>
+                <strong>Guardrail menolak {rejectedCount} kandidat</strong>
                 <p>
-                  Hasil tersensor masuk ke Operational Zone, sementara dokumen original dienkripsi di Sovereign Vault.
-                  Sebagai user, kamu tidak bisa membuka original &mdash; akses itu hanya lewat jalur otorisasi
-                  pemerintah.
+                  Deteksi yang dicurigai sebagai gambar tangan/sketsa atau tidak punya bukti dokumen resmi tidak ikut
+                  diredaksi pada mode precision demo.
                 </p>
               </div>
             </div>
           )}
+        </div>
+      )}
 
-          {result && (
-            <Collapsible title="Detail Teknis (JSON)">
-              <JsonBlock data={result.ok ? result.data : result.error} />
-            </Collapsible>
-          )}
-        </Panel>
-      </div>
+      {result && !result.ok && (
+        <div className="alert-card warning">
+          <ShieldCheck size={24} color="var(--danger)" />
+          <div>
+            <strong>Gagal Memproses Dokumen</strong>
+            <p>{result.error?.message || "Terjadi kesalahan pada sistem."}</p>
+          </div>
+        </div>
+      )}
+
+      {result?.ok && (
+        <div className="alert-card success">
+          <LockKeyhole size={24} color="var(--success)" />
+          <div>
+            <strong>Output aman tersimpan</strong>
+            <p>
+              Hasil tersensor masuk ke Operational Zone, sementara dokumen original dienkripsi di Sovereign Vault.
+              Sebagai user, kamu tidak bisa membuka original - akses itu hanya lewat jalur otorisasi pemerintah.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <Collapsible title="Detail Teknis (JSON)">
+          <JsonBlock data={result.ok ? result.data : result.error} />
+        </Collapsible>
+      )}
     </div>
   );
 }
