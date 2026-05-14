@@ -13,6 +13,7 @@ from app.db.database import get_db
 from app.db.models import OperationalMetadata
 from app.db.repositories import OperationalMetadataRepository
 from app.services.audit_service import create_audit_log
+from app.services.authenticity_service import analyze_detections
 from app.services.redaction_service import redact_image
 from app.services.robustness_service import robust_predict_with_tta
 from app.services.storage_service import save_operational_metadata, save_redacted_image_to_operational_zone
@@ -61,6 +62,8 @@ async def redact_upload(
     mode = validate_redaction_mode(redaction_mode or rule.mode)
     active = build_active_classes(rule.active_classes, active_classes, disabled_classes)
     prediction = robust_predict_with_tta(detector, image, confidence_threshold, tta_angles=tta_angles) if document_tta and profile == "government" else detector.predict(image, confidence_threshold)
+    # KTP authenticity heuristics — run on the original image, before redaction hides the card.
+    ktp_authenticity = analyze_detections(image, prediction["detections"], run_ocr=True)
     redaction = redact_image(image, prediction["detections"], mode=mode, active_classes=active, label_enabled=rule.label_enabled, label_text=label_text)
 
     record_id = f"rec_{uuid.uuid4().hex}"
@@ -104,6 +107,17 @@ async def redact_upload(
     create_audit_log(db, record_id, "Sovereign Vault", "encrypted_original_stored", "system", "Encrypted original stored", {"key_version": vault_record.key_version})
     if dynamic_injection:
         create_audit_log(db, record_id, "Dynamic Injection", "runtime_policy_applied", "system", "Runtime policy applied to redaction", dynamic_injection)
+    flagged_ktp = [item for item in ktp_authenticity if item["verdict"] in ("suspicious", "likely_fake")]
+    if flagged_ktp:
+        create_audit_log(
+            db,
+            record_id,
+            "Operational Zone",
+            "ktp_authenticity_flagged",
+            "system",
+            f"{len(flagged_ktp)} KTP detection(s) flagged by authenticity heuristics",
+            {"flagged": [{"verdict": i["verdict"], "fake_likelihood": i["fake_likelihood"], "signals": i["signals"]} for i in flagged_ktp]},
+        )
     db.commit()
 
     return {
@@ -123,6 +137,7 @@ async def redact_upload(
         "detections": prediction["detections"],
         "redacted_detections": redaction["redacted_detections"],
         "skipped_detections": redaction["skipped_detections"],
+        "ktp_authenticity": ktp_authenticity,
         "operational_zone": {"redacted_file": redacted_file, "metadata_file": metadata_file, "stores_private_original": False},
         "sovereign_vault": {"encrypted": True, "key_id": vault_record.key_id, "key_version": vault_record.key_version, "encrypted_bundle_path": vault_record.encrypted_bundle_path, "original_sha256": vault_bundle["original_sha256"], "plaintext_stored": False},
     }

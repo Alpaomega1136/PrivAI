@@ -1,7 +1,6 @@
 import {
   Activity,
   Building2,
-  Camera,
   ChevronDown,
   ChevronRight,
   Cpu,
@@ -40,7 +39,6 @@ import {
   getTurboLiveStatus,
   getVaultRecord,
   HealthResponse,
-  redactLiveFrame,
   redactImage,
   RedactionConfigResponse,
   resetRuntimePolicy,
@@ -72,7 +70,7 @@ const navItems: Array<{ id: ViewId; label: string; icon: ReactNode; description:
   { id: "vault", label: "Sovereign Vault", icon: <LockKeyhole size={20} />, description: "Penyimpanan asli" },
   { id: "government", label: "Akses Pemerintah", icon: <Landmark size={20} />, description: "Otorisasi khusus" },
   { id: "dynamic", label: "Dynamic Policy", icon: <SlidersHorizontal size={20} />, description: "Aturan runtime" },
-  { id: "live", label: "Live Stream", icon: <Video size={20} />, description: "Privasi kamera" },
+  { id: "live", label: "Live Camera", icon: <Video size={20} />, description: "Privasi kamera real-time" },
   { id: "audit", label: "Audit Log", icon: <Activity size={20} />, description: "Jejak aktivitas" },
 ];
 
@@ -151,7 +149,9 @@ export default function App() {
         {activeView === "vault" && <VaultView records={records} keyInfo={dashboard.cryptoKeyInfo} />}
         {activeView === "government" && <GovernmentAccess latestRecordId={latestRecordId} />}
         {activeView === "dynamic" && <DynamicInjection redactionConfig={dashboard.redactionConfig.data ?? null} onRefresh={refreshDashboard} />}
-        {activeView === "live" && <LiveStream />}
+        <div style={{ display: activeView === "live" ? "" : "none" }}>
+          <LiveStream isActive={activeView === "live"} />
+        </div>
         {activeView === "audit" && <AuditLogView initialLogs={dashboard.auditLogs} />}
       </main>
     </div>
@@ -356,7 +356,8 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
                   <div key={i} className="badge copper">{d.class_name} {(d.confidence * 100).toFixed(0)}%</div>
                 ))}
               </div>
-              <button type="button" className="primary-button secondary-button" onClick={() => window.open(redactedUrl, "_blank")}>Buka Gambar Redaksi</button>
+              <KtpAuthenticityPanel items={(result.data?.ktp_authenticity as KtpAuthenticityItem[]) ?? []} />
+              <button type="button" className="primary-button secondary-button" style={{ marginTop: '12px' }} onClick={() => window.open(redactedUrl, "_blank")}>Buka Gambar Redaksi</button>
             </div>
           )}
 
@@ -756,144 +757,47 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
   );
 }
 
-function LiveStream() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<number | null>(null);
-  const turboIntervalRef = useRef<number | null>(null);
-
-  const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isContinuous, setIsContinuous] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
-  const [redactionMode, setRedactionMode] = useState("blur");
-  const [activeClasses, setActiveClasses] = useState("Wajah");
-  const [redactedImage, setRedactedImage] = useState("");
-  const [frameStats, setFrameStats] = useState<Record<string, unknown> | null>(null);
-  const [browserError, setBrowserError] = useState("");
+function LiveStream({ isActive }: { isActive: boolean }) {
+  const statusIntervalRef = useRef<number | null>(null);
 
   const [sessionId] = useState("default");
   const [cameraIndex, setCameraIndex] = useState(0);
-  const [targetWidth, setTargetWidth] = useState(416);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
+  const [redactionMode, setRedactionMode] = useState("blur");
+  const [activeClasses, setActiveClasses] = useState("Wajah");
+  const [targetWidth, setTargetWidth] = useState(640);
   const [inferIntervalMs, setInferIntervalMs] = useState(90);
   const [jpegQuality, setJpegQuality] = useState(75);
   const [boxHoldMs, setBoxHoldMs] = useState(700);
-  const [turboStatus, setTurboStatus] = useState<Record<string, unknown> | null>(null);
+  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
   const [streamUrl, setStreamUrl] = useState("");
   const [mjpegError, setMjpegError] = useState(false);
-  const [turboMessage, setTurboMessage] = useState("");
-  const [turboError, setTurboError] = useState("");
-  const [isTurboBusy, setIsTurboBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
 
-  async function startBrowserCamera() {
-    setBrowserError("");
-    if (!navigator.mediaDevices?.getUserMedia) {
-      const isHttp = window.location.protocol === "http:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-      setBrowserError(
-        isHttp
-          ? "Akses kamera diblokir karena halaman dibuka via HTTP (bukan HTTPS). Buka via https:// atau gunakan localhost."
-          : "Browser ini tidak mendukung akses kamera (getUserMedia tidak tersedia)."
-      );
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 960, height: 540 }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setIsCameraOn(true);
-    } catch (error) {
-      if (error instanceof DOMException) {
-        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-          setBrowserError("Izin kamera ditolak. Klik ikon kunci/kamera di address bar browser dan izinkan akses kamera.");
-        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-          setBrowserError("Tidak ada kamera yang terdeteksi. Pastikan kamera terhubung dan tidak digunakan oleh aplikasi lain.");
-        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-          setBrowserError("Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.");
-        } else {
-          setBrowserError(`Gagal membuka kamera: ${error.message}`);
-        }
-      } else {
-        setBrowserError(error instanceof Error ? error.message : "Gagal membuka kamera browser.");
-      }
-    }
+  // Bangun URL stream dengan cache-buster baru setiap kali dibuka. URL stabil selama
+  // satu sesi (tidak reconnect saat re-render), tapi berubah saat stop->start ulang
+  // sehingga <img> benar-benar memuat ulang stream baru.
+  function openStream() {
+    setMjpegError(false);
+    setError("");
+    setStreamUrl(`${buildTurboMjpegUrl(sessionId)}&t=${Date.now()}`);
   }
 
-  function stopBrowserCamera() {
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-    intervalRef.current = null;
-    setIsContinuous(false);
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setIsCameraOn(false);
-  }
-
-  function captureFrameBlob() {
-    return new Promise<Blob>((resolve, reject) => {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !canvas || !video.videoWidth || !video.videoHeight) {
-        reject(new Error("Kamera belum siap untuk capture frame."));
-        return;
-      }
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Gagal capture frame."))), "image/jpeg", 0.82);
-    });
-  }
-
-  async function processOneFrame() {
-    if (!isCameraOn || isProcessing) return;
-    setIsProcessing(true);
-    setBrowserError("");
-    const response = await safeRequest(async () => {
-      const frameBlob = await captureFrameBlob();
-      return redactLiveFrame({
-        frameBlob,
-        confidenceThreshold,
-        redactionMode,
-        activeClasses,
-      });
-    });
-    setIsProcessing(false);
-    if (!response.ok) {
-      setBrowserError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memproses frame.");
-      return;
-    }
-    const mimeType = String(response.data?.mime_type ?? "image/jpeg");
-    const imageBase64 = String(response.data?.frame_image_base64 ?? "");
-    setRedactedImage(imageBase64 ? `data:${mimeType};base64,${imageBase64}` : "");
-    setFrameStats(response.data ?? null);
-  }
-
-  function startContinuous() {
-    if (!isCameraOn || intervalRef.current) return;
-    setIsContinuous(true);
-    intervalRef.current = window.setInterval(() => void processOneFrame(), 900);
-  }
-
-  function stopContinuous() {
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-    intervalRef.current = null;
-    setIsContinuous(false);
-  }
-
-  async function refreshTurboStatus() {
+  async function refreshStatus() {
     const response = await safeRequest(() => getTurboLiveStatus(sessionId));
     if (response.ok) {
-      setTurboStatus(response.data ?? null);
-      setTurboError("");
+      setStatus(response.data ?? null);
     } else {
-      setTurboError(response.error?.message || "Gagal membaca status Turbo Live.");
+      setError(response.error?.message || "Gagal membaca status Live Camera.");
     }
   }
 
-  async function startTurbo() {
-    setIsTurboBusy(true);
-    setTurboError("");
-    setTurboMessage("");
+  async function startLiveCamera() {
+    setIsBusy(true);
+    setError("");
+    setMessage("");
     const response = await safeRequest(() => startTurboLive({
       sessionId,
       cameraIndex,
@@ -905,74 +809,64 @@ function LiveStream() {
       jpegQuality,
       boxHoldMs,
     }));
-    setIsTurboBusy(false);
+    setIsBusy(false);
     if (!response.ok) {
-      setTurboError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memulai Turbo Live.");
+      setError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memulai Live Camera.");
       return;
     }
-    setTurboStatus(response.data ?? null);
-    setMjpegError(false);
-    setStreamUrl(buildTurboMjpegUrl(sessionId));
-    setTurboMessage("Turbo Live berjalan dari kamera lokal backend.");
+    setStatus(response.data ?? null);
+    openStream();
+    setMessage("Live Camera berjalan dari kamera lokal backend.");
   }
 
-  async function stopTurbo() {
-    setIsTurboBusy(true);
+  async function stopLiveCamera() {
+    setIsBusy(true);
     const response = await safeRequest(() => stopTurboLive(sessionId));
-    setIsTurboBusy(false);
+    setIsBusy(false);
     if (response.ok) {
-      setTurboStatus(response.data ?? null);
+      setStatus(response.data ?? null);
       setStreamUrl("");
       setMjpegError(false);
-      setTurboMessage("Turbo Live dihentikan.");
-      setTurboError("");
+      setMessage("Live Camera dihentikan.");
+      setError("");
     } else {
-      setTurboError(response.error?.message || "Gagal menghentikan Turbo Live.");
+      setError(response.error?.message || "Gagal menghentikan Live Camera.");
     }
   }
 
+  // Polling status hanya berjalan saat view Live Camera sedang dibuka.
   useEffect(() => {
-    void refreshTurboStatus();
-    turboIntervalRef.current = window.setInterval(() => void refreshTurboStatus(), 2000);
+    if (!isActive) {
+      if (statusIntervalRef.current) {
+        window.clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
+      return;
+    }
+    void refreshStatus();
+    statusIntervalRef.current = window.setInterval(() => void refreshStatus(), 2000);
     return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current);
-      if (turboIntervalRef.current) window.clearInterval(turboIntervalRef.current);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (statusIntervalRef.current) {
+        window.clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
     };
-  }, []);
+  }, [isActive]);
 
-  const running = turboStatus?.running === true;
-  const latestStats = (turboStatus?.latest_stats ?? {}) as Record<string, unknown>;
+  const running = status?.running === true;
+  const latestStats = (status?.latest_stats ?? {}) as Record<string, unknown>;
 
   return (
     <div className="view-stack">
       <section className="hero-panel live-hero">
-        <h2>Live Stream Privacy Filter</h2>
-        <p className="lead">Mode sekunder untuk menyamarkan wajah pada kamera real-time. Frame diproses sementara dan tidak disimpan di Operational Zone maupun Sovereign Vault.</p>
+        <h2>Live Camera Privacy Filter</h2>
+        <p className="lead">Kamera lokal backend diproses real-time dengan deteksi AI dan redaksi visual. Frame diproses sementara dan tidak disimpan di Operational Zone maupun Sovereign Vault.</p>
       </section>
 
       <div className="two-column">
-        <Panel title="Browser Webcam" eyebrow="Ephemeral Frame Upload" icon={<Camera />}>
-          <div className="live-frame">
-            <video ref={videoRef} autoPlay playsInline muted />
-            <canvas ref={canvasRef} hidden />
-            {!isCameraOn && <div className="empty-state">Kamera browser belum aktif.</div>}
-          </div>
-          <div className="button-row">
-            {!isCameraOn ? (
-              <button type="button" onClick={startBrowserCamera}>Start Camera</button>
-            ) : (
-              <button type="button" className="secondary-button" onClick={stopBrowserCamera}>Stop Camera</button>
-            )}
-            <button type="button" onClick={() => void processOneFrame()} disabled={!isCameraOn || isProcessing}>
-              {isProcessing ? <><RefreshCw className="spin" size={16} /> Processing</> : "Process Frame"}
-            </button>
-            <button type="button" className="secondary-button" onClick={isContinuous ? stopContinuous : startContinuous} disabled={!isCameraOn}>
-              {isContinuous ? "Stop Continuous" : "Start Continuous"}
-            </button>
-          </div>
-
-          <div className="form-grid live-settings">
+        <Panel title="Pengaturan Live Camera" eyebrow="Backend Camera" icon={<Video />}>
+          <div className="form-grid">
+            <Field label="Camera Index"><input type="number" min="0" value={cameraIndex} onChange={(event) => setCameraIndex(Number(event.target.value))} /></Field>
             <Field label={`Confidence (${confidenceThreshold})`}>
               <input type="range" min="0.01" max="0.99" step="0.01" value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(Number(event.target.value))} />
             </Field>
@@ -983,97 +877,64 @@ function LiveStream() {
                 <option value="black_box">black_box</option>
               </select>
             </Field>
-            <Field label="Active Classes">
-              <input value={activeClasses} onChange={(event) => setActiveClasses(event.target.value)} />
-            </Field>
-          </div>
-          {browserError && <div className="result-box error-box">{browserError}</div>}
-          {frameStats && (
-            <div className="meta-row">
-              <div className="meta-item"><span>Latency</span><strong>{String(frameStats.latency_ms ?? 0)} ms</strong></div>
-              <div className="meta-item"><span>Deteksi</span><strong>{String(frameStats.detection_count ?? 0)}</strong></div>
-              <div className="meta-item"><span>Diredaksi</span><strong>{String(frameStats.redacted_count ?? 0)}</strong></div>
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Redacted Browser Output" eyebrow="No Persistence" icon={<EyeOff />}>
-          <div className="live-frame">
-            {redactedImage ? <img src={redactedImage} alt="Redacted webcam frame" /> : <div className="empty-state">Output frame akan tampil setelah diproses.</div>}
-          </div>
-          <div className="alert-card success">
-            <ShieldCheck size={24} color="var(--success)" />
-            <div>
-              <strong>Ephemeral Processing</strong>
-              <p>Frame live tidak disimpan ke storage dan tidak masuk vault. Ini berbeda dari flow dokumen pemerintah.</p>
-            </div>
-          </div>
-        </Panel>
-      </div>
-
-      <div className="two-column">
-        <Panel title="Turbo Live Backend Camera" eyebrow="MJPEG Stream" icon={<Video />}>
-          <div className="form-grid">
-            <Field label="Camera Index"><input type="number" min="0" value={cameraIndex} onChange={(event) => setCameraIndex(Number(event.target.value))} /></Field>
+            <Field label="Active Classes"><input value={activeClasses} onChange={(event) => setActiveClasses(event.target.value)} /></Field>
             <Field label="Target Width"><input type="number" min="240" max="1280" value={targetWidth} onChange={(event) => setTargetWidth(Number(event.target.value))} /></Field>
             <Field label="Infer Interval (ms)"><input type="number" min="50" max="2000" value={inferIntervalMs} onChange={(event) => setInferIntervalMs(Number(event.target.value))} /></Field>
             <Field label="JPEG Quality"><input type="number" min="35" max="95" value={jpegQuality} onChange={(event) => setJpegQuality(Number(event.target.value))} /></Field>
             <Field label="Box Hold (ms)"><input type="number" min="100" max="5000" value={boxHoldMs} onChange={(event) => setBoxHoldMs(Number(event.target.value))} /></Field>
           </div>
           <div className="button-row">
-            <button type="button" onClick={startTurbo} disabled={isTurboBusy}>{isTurboBusy ? "Working..." : "Start Turbo"}</button>
-            <button type="button" className="secondary-button" onClick={stopTurbo} disabled={isTurboBusy}>Stop</button>
-            <button type="button" className="secondary-button" onClick={() => void refreshTurboStatus()}>Refresh Status</button>
+            <button type="button" onClick={startLiveCamera} disabled={isBusy}>
+              {isBusy ? <><RefreshCw className="spin" size={16} /> Working...</> : "Start Live Camera"}
+            </button>
+            <button type="button" className="secondary-button" onClick={stopLiveCamera} disabled={isBusy}>Stop</button>
+            <button type="button" className="secondary-button" onClick={() => void refreshStatus()}>Refresh Status</button>
           </div>
-          {turboMessage && <div className="result-box success-box">{turboMessage}</div>}
-          {turboError && <div className="result-box error-box">{turboError}</div>}
+          {message && <div className="result-box success-box">{message}</div>}
+          {error && <div className="result-box error-box">{error}</div>}
+          <div className="alert-card success">
+            <ShieldCheck size={24} color="var(--success)" />
+            <div>
+              <strong>Ephemeral Processing</strong>
+              <p>Frame live diproses sementara, tidak disimpan ke storage dan tidak masuk vault. Berbeda dari flow dokumen pemerintah.</p>
+            </div>
+          </div>
         </Panel>
 
-        <Panel title="Turbo Output" eyebrow={running ? "Running" : "Stopped"} icon={<Video />}>
+        <Panel title="Live Camera Output" eyebrow={running ? "Running" : "Stopped"} icon={<Video />}>
           <div className="live-frame">
             {streamUrl && !mjpegError ? (
               <img
                 src={streamUrl}
-                alt="Turbo live MJPEG stream"
+                alt="Live camera MJPEG stream"
                 onError={() => {
                   setMjpegError(true);
-                  setTurboError("MJPEG stream terputus atau tidak dapat dibuka. Pastikan sesi masih berjalan lalu klik Reconnect.");
+                  setError("Stream terputus atau tidak dapat dibuka. Pastikan sesi masih berjalan lalu klik Reconnect.");
                 }}
               />
             ) : mjpegError ? (
               <div className="empty-state">
                 <p style={{ color: "var(--danger)", marginBottom: "12px" }}>Stream terputus.</p>
-                <button
-                  type="button"
-                  className="primary-button secondary-button"
-                  onClick={() => { setMjpegError(false); setTurboError(""); setStreamUrl(buildTurboMjpegUrl(sessionId)); }}
-                >
-                  Reconnect Stream
-                </button>
+                <button type="button" className="primary-button secondary-button" onClick={openStream}>Reconnect Stream</button>
               </div>
             ) : running ? (
               <div className="empty-state">
                 <p style={{ marginBottom: "12px" }}>Sesi aktif di backend.</p>
-                <button
-                  type="button"
-                  className="primary-button secondary-button"
-                  onClick={() => { setMjpegError(false); setTurboError(""); setStreamUrl(buildTurboMjpegUrl(sessionId)); }}
-                >
-                  Sambungkan Stream
-                </button>
+                <button type="button" className="primary-button secondary-button" onClick={openStream}>Sambungkan Stream</button>
               </div>
             ) : (
-              <div className="empty-state">Klik Start Turbo untuk membuka stream MJPEG dari backend.</div>
+              <div className="empty-state">Klik Start Live Camera untuk membuka stream dari kamera backend.</div>
             )}
           </div>
           <div className="meta-row">
-            <div className="meta-item"><span>Frames</span><strong>{String(turboStatus?.frame_counter ?? 0)}</strong></div>
-            <div className="meta-item"><span>Inference</span><strong>{String(turboStatus?.inference_counter ?? 0)}</strong></div>
+            <div className="meta-item"><span>Frames</span><strong>{String(status?.frame_counter ?? 0)}</strong></div>
+            <div className="meta-item"><span>Inference</span><strong>{String(status?.inference_counter ?? 0)}</strong></div>
             <div className="meta-item"><span>Latency</span><strong>{String(latestStats.latency_ms ?? 0)} ms</strong></div>
             <div className="meta-item"><span>Redacted</span><strong>{String(latestStats.redacted_count ?? 0)}</strong></div>
           </div>
-          <Collapsible title="Detail Turbo Status">
-            <JsonBlock data={turboStatus} />
+          <KtpAuthenticityPanel items={(status?.ktp_authenticity as KtpAuthenticityItem[]) ?? []} />
+          <Collapsible title="Detail Status">
+            <JsonBlock data={status} />
           </Collapsible>
         </Panel>
       </div>
@@ -1189,6 +1050,81 @@ function Collapsible({ title, children }: { title: string; children: ReactNode }
         {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
       {isOpen && <div className="collapsible-content">{children}</div>}
+    </div>
+  );
+}
+
+type KtpAuthenticityItem = {
+  class_name?: string;
+  confidence?: number;
+  verdict?: string;
+  fake_likelihood?: number;
+  reason?: string;
+  signals?: Record<string, unknown>;
+  nik?: { value_masked?: string | null; found?: boolean; valid?: boolean | null; issues?: string[] } | null;
+};
+
+function verdictMeta(verdict?: string): { label: string; badge: string } {
+  if (verdict === "genuine") return { label: "Indikasi Asli", badge: "green" };
+  if (verdict === "suspicious") return { label: "Mencurigakan", badge: "copper" };
+  if (verdict === "likely_fake") return { label: "Indikasi Palsu", badge: "danger" };
+  return { label: "Tidak Konklusif", badge: "muted" };
+}
+
+function fmtSignal(value: unknown): string {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : "-";
+}
+
+function KtpAuthenticityPanel({ items }: { items: KtpAuthenticityItem[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="result-box" style={{ marginTop: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+        <ShieldCheck size={18} color="var(--primary)" />
+        <strong>Keaslian KTP (Heuristik)</strong>
+      </div>
+      {items.map((item, index) => {
+        const meta = verdictMeta(item.verdict);
+        const likelihood = Math.round(Number(item.fake_likelihood ?? 0) * 100);
+        const signals = item.signals ?? {};
+        return (
+          <div
+            key={index}
+            style={{
+              borderTop: index > 0 ? "1px solid var(--surface-strong)" : "none",
+              paddingTop: index > 0 ? "12px" : 0,
+              marginTop: index > 0 ? "12px" : 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+              <div className={`badge ${meta.badge}`}>{meta.label}</div>
+              <small>Kemungkinan palsu: <strong>{likelihood}%</strong></small>
+              {item.reason && item.reason !== "ok" && (
+                <small style={{ color: "var(--muted)" }}>({item.reason})</small>
+              )}
+            </div>
+            <div className="meta-row" style={{ marginBottom: item.nik ? "8px" : 0 }}>
+              <div className="meta-item"><span>Moiré</span><strong>{fmtSignal(signals.moire)}</strong></div>
+              <div className="meta-item"><span>Ketajaman</span><strong>{fmtSignal(signals.sharpness)}</strong></div>
+              <div className="meta-item"><span>Glare PVC</span><strong>{fmtSignal(signals.glare_genuine)}</strong></div>
+              <div className="meta-item"><span>NIK Invalid</span><strong>{fmtSignal(signals.nik_invalid)}</strong></div>
+            </div>
+            {item.nik && (
+              <small style={{ color: "var(--muted)" }}>
+                NIK: {item.nik.found ? item.nik.value_masked : "tidak terbaca OCR"}
+                {item.nik.found &&
+                  (item.nik.valid
+                    ? " — struktur valid"
+                    : ` — masalah: ${(item.nik.issues ?? []).join(", ") || "-"}`)}
+              </small>
+            )}
+          </div>
+        );
+      })}
+      <small style={{ display: "block", marginTop: "10px", color: "var(--muted)" }}>
+        Indikator heuristik (FFT moiré + ketajaman + glare + struktur NIK), bukan vonis hukum.
+      </small>
     </div>
   );
 }
