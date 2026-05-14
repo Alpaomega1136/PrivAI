@@ -71,7 +71,6 @@ export function GovernmentOverviewView({
         <div className="metric-card">
           <span>Original Terenkripsi</span>
           <strong>{encryptedCount}</strong>
-          {encryptedCount > 0 && <div className="badge green">AMAN</div>}
         </div>
         <div className="metric-card">
           <span>Audit Events</span>
@@ -80,7 +79,6 @@ export function GovernmentOverviewView({
         <div className="metric-card">
           <span>Model AI</span>
           <strong>{modelActive ? "Aktif" : "Tidak tersedia"}</strong>
-          <div className={`badge ${modelActive ? "green" : "danger"}`}>{modelActive ? "READY" : "OFFLINE"}</div>
         </div>
       </section>
 

@@ -5,17 +5,13 @@ import privaiLogo from "../assets/PrivAI_logo.png";
 import { ModeSwitch } from "../components/ModeSwitch";
 import { AppMode, GovernmentViewId, governmentNavItems } from "../lib/navigation";
 
-// ╔═══ ASSET — ubah di sini ═══╗
-// Logo brand di sidebar console. Ganti file di src/assets/ atau arahkan import lain.
 const BRAND_LOGO = privaiLogo;
-// ╚════════════════════════════╝
 
 export function GovernmentShell({
   appMode,
   onModeChange,
   activeView,
   onNavigate,
-  online,
   isLoading,
   onRefresh,
   children,
@@ -34,14 +30,15 @@ export function GovernmentShell({
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand-card">
-          <img src={BRAND_LOGO} alt="PrivAI Logo" style={{ height: 48, width: "auto", objectFit: "contain" }} />
+        <button type="button" className="brand-card government-brand-card" onClick={() => onNavigate("overview")}>
+          <img className="government-brand-logo" src={BRAND_LOGO} alt="PrivAI Logo" />
           <small>Government Console</small>
-        </div>
+        </button>
         <nav>
           {governmentNavItems.map((item) => (
             <button
               key={item.id}
+              type="button"
               className={activeView === item.id ? "nav-item active" : "nav-item"}
               onClick={() => onNavigate(item.id)}
             >
@@ -56,10 +53,6 @@ export function GovernmentShell({
         <header className="topbar">
           <div className="title-group">
             <h1>{activeTitle}</h1>
-            <div className={`status-pill ${online ? "active" : "offline"}`}>
-              <div className="dot" />
-              {online ? "Sistem Aktif" : "Sistem Offline"}
-            </div>
           </div>
           <div className="topbar-actions">
             <ModeSwitch appMode={appMode} onModeChange={onModeChange} />
