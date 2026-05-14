@@ -4,7 +4,9 @@ from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from app.ai.class_map import CANONICAL_CLASSES, serialize_classes
 from app.core.config import get_settings
+from app.core.redaction_policy import ALLOWED_REDACTION_MODES, serialize_redaction_profiles
 from app.db.database import get_database_path, get_db, init_db
 from app.services.audit_service import list_audit_logs
 
@@ -51,6 +53,16 @@ def health() -> dict[str, object]:
         "operational_zone": "ready" if settings.operational_redacted_dir.exists() else "missing",
         "sovereign_vault": "ready" if settings.vault_encrypted_original_dir.exists() else "missing",
         "database": "ready" if database_path and database_path.exists() else "pending_startup",
+    }
+
+
+@app.get("/api/redaction-config")
+def get_redaction_config() -> dict[str, object]:
+    return {
+        "profiles": serialize_redaction_profiles(),
+        "allowed_modes": ALLOWED_REDACTION_MODES,
+        "classes": serialize_classes(),
+        "canonical_classes": CANONICAL_CLASSES,
     }
 
 
