@@ -18,6 +18,7 @@ import {
   Copy
 } from "lucide-react";
 import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from "react";
+import privaiLogo from "./assets/PrivAI_logo.png";
 
 import {
   ApiError,
@@ -194,8 +195,7 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-card">
-          <div className="brand-icon"><ShieldCheck size={32} /></div>
-          <strong>PrivAI</strong>
+          <img src={privaiLogo} alt="PrivAI Logo" style={{ height: 48, width: 'auto', objectFit: 'contain' }} />
           <small>Visual Privacy Firewall</small>
         </div>
         <nav>
