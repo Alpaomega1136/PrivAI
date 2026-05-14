@@ -1,11 +1,21 @@
 import { RefreshCw } from "lucide-react";
 import { ReactNode } from "react";
 
+import aiConnectLogo from "../assets/AiConnect.png";
+import dtetiLogo from "../assets/DTETI.png";
+import finditLogo from "../assets/FINDIT.png";
 import privaiLogo from "../assets/PrivAI_logo.png";
+import ugmLogo from "../assets/ugm.png";
 import { ModeSwitch } from "../components/ModeSwitch";
 import { AppMode, GovernmentViewId, governmentNavItems } from "../lib/navigation";
 
 const BRAND_LOGO = privaiLogo;
+const PARTNER_LOGOS = [
+  { src: ugmLogo, alt: "UGM" },
+  { src: dtetiLogo, alt: "DTETI" },
+  { src: finditLogo, alt: "FIND IT" },
+  { src: aiConnectLogo, alt: "AI Connect" },
+];
 
 export function GovernmentShell({
   appMode,
@@ -56,6 +66,11 @@ export function GovernmentShell({
           </div>
           <div className="topbar-actions">
             <ModeSwitch appMode={appMode} onModeChange={onModeChange} />
+            <div className="government-topbar-logo-strip" aria-label="Partner logos">
+              {PARTNER_LOGOS.map((logo) => (
+                <img key={logo.alt} src={logo.src} alt={logo.alt} />
+              ))}
+            </div>
             <button className="primary-button secondary-button" onClick={onRefresh} disabled={isLoading}>
               <RefreshCw className={isLoading ? "spin" : ""} size={16} />
               Refresh
