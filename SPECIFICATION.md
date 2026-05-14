@@ -1,9 +1,9 @@
-# PrivAI Guard — Specification Document
+﻿# PrivAI â€” Specification Document
 
 **Versi Dokumen:** 1.0
 **Tanggal:** Mei 2026
 **Tim:** TIMOREX
-**Kompetisi:** FindIT! 2026 — Hackathon Track A (Edge Vision)
+**Kompetisi:** FindIT! 2026 â€” Hackathon Track A (Edge Vision)
 **Status:** Master Specification for 24-Hour Hackathon Implementation
 
 ---
@@ -35,9 +35,9 @@
 
 ## 1. Ringkasan Eksekutif
 
-**PrivAI Guard** adalah aplikasi *Visual Firewall* berbasis kecerdasan buatan yang melakukan intersepsi cerdas antara kamera/input visual pengguna dengan platform layanan publik atau privat. Sistem ini mendeteksi enam kategori data sensitif (KTP, SIM, Paspor, NIK Teks, Wajah Pihak Ketiga, dan Plat Nomor Kendaraan) secara *real-time* di perangkat lokal pengguna, kemudian menerapkan redaksi visual untuk versi publik sambil mengenkripsi data asli dalam *Sovereign Vault* lokal yang hanya bisa dibuka oleh pejabat berwenang.
+**PrivAI** adalah aplikasi *Visual Firewall* berbasis kecerdasan buatan yang melakukan intersepsi cerdas antara kamera/input visual pengguna dengan platform layanan publik atau privat. Sistem ini mendeteksi enam kategori data sensitif (KTP, SIM, Paspor, NIK Teks, Wajah Pihak Ketiga, dan Plat Nomor Kendaraan) secara *real-time* di perangkat lokal pengguna, kemudian menerapkan redaksi visual untuk versi publik sambil mengenkripsi data asli dalam *Sovereign Vault* lokal yang hanya bisa dibuka oleh pejabat berwenang.
 
-Solusi ini menjawab tema kompetisi **"Digital Sovereignty: Empowering National Resilience with Adaptive Intelligence"** dengan menempatkan dirinya sebagai infrastruktur kedaulatan data pribadi—mencegah kebocoran identitas di sumbernya, tanpa mengirim data sensitif ke server pihak ketiga.
+Solusi ini menjawab tema kompetisi **"Digital Sovereignty: Empowering National Resilience with Adaptive Intelligence"** dengan menempatkan dirinya sebagai infrastruktur kedaulatan data pribadiâ€”mencegah kebocoran identitas di sumbernya, tanpa mengirim data sensitif ke server pihak ketiga.
 
 Aplikasi dirancang dengan filosofi *Zero-Trust Edge Computing*: seluruh inferensi AI dan enkripsi dieksekusi murni di *localhost*, tanpa ketergantungan pada *cloud*. Model AI yang digunakan adalah YOLO11n hasil pelatihan Tahap 2 dengan ukuran 5.3 MB, *recall* 96.66%, dan latensi inferensi ~200-300 ms pada CPU standar.
 
@@ -53,15 +53,15 @@ Indonesia berada di puncak hiper-konektivitas digital dengan 212 juta pengguna i
 
 Dua sumber kebocoran data identitas utama:
 
-1. **Keteledoran Individual (Oversharing)** — Lebih dari 84% pengguna mengunggah informasi pribadi mingguan, dengan 42% di antaranya membagikan detail sensitif termasuk dokumen identitas legal (KTP, SIM, Paspor) tanpa sensor.
+1. **Keteledoran Individual (Oversharing)** â€” Lebih dari 84% pengguna mengunggah informasi pribadi mingguan, dengan 42% di antaranya membagikan detail sensitif termasuk dokumen identitas legal (KTP, SIM, Paspor) tanpa sensor.
 
-2. **Kegagalan Struktural Sentralistik** — Insiden ransomware Pusat Data Nasional (Juni 2024) dan kebocoran 4.7 juta data ASN dari BKN menunjukkan cacat mendasar paradigma data tersentralisasi yang menciptakan *single point of failure*.
+2. **Kegagalan Struktural Sentralistik** â€” Insiden ransomware Pusat Data Nasional (Juni 2024) dan kebocoran 4.7 juta data ASN dari BKN menunjukkan cacat mendasar paradigma data tersentralisasi yang menciptakan *single point of failure*.
 
 ### 2.2 Mengapa Solusi Ini Diperlukan
 
 Solusi konvensional (Google Vision API, AWS Rekognition) menawarkan akurasi tinggi namun **mewajibkan eksfiltrasi data sensitif ke server luar negeri**, secara langsung melanggar UU PDP No. 27 Tahun 2022 dan prinsip kedaulatan data nasional.
 
-PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
+PrivAI mengisi gap ini sebagai satu-satunya alternatif yang:
 - Beroperasi **100% offline** di perangkat lokal
 - Mengkompres model AI hingga 5.3 MB sehingga dapat berjalan di CPU loket pemerintahan
 - Mengenkripsi data asli dengan AES-256-GCM lokal sehingga server jebol = data tetap aman
@@ -69,7 +69,7 @@ PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
 
 ### 2.3 Pemosisian Produk
 
-| Aspek | PrivAI Guard | Cloud API Konvensional |
+| Aspek | PrivAI | Cloud API Konvensional |
 |---|---|---|
 | Lokasi Inferensi | Localhost (Edge) | Server pihak ketiga |
 | Kedaulatan Data | Penuh | Hilang saat upload |
@@ -84,7 +84,7 @@ PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
 
 ### 3.1 Tujuan Strategis (Strategic Goals)
 
-**G1. Membangun MVP fungsional dalam 24 jam** yang mampu mendemonstrasikan seluruh pipeline: Detect → Redact → Encrypt → Store → Audit.
+**G1. Membangun MVP fungsional dalam 24 jam** yang mampu mendemonstrasikan seluruh pipeline: Detect â†’ Redact â†’ Encrypt â†’ Store â†’ Audit.
 
 **G2. Memenuhi 100% kriteria penilaian Tahap 3** dengan distribusi bobot:
 - AI Judge (Live Inference, Integrity, Optimization, Tech Defense)
@@ -99,8 +99,8 @@ PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
 
 | ID | Sasaran | Metrik Keberhasilan |
 |---|---|---|
-| O1 | Live camera detection beroperasi *real-time* | ≥ 25 FPS, latensi ≤ 400 ms |
-| O2 | Upload batch processing | 10 dokumen dalam ≤ 5 detik |
+| O1 | Live camera detection beroperasi *real-time* | â‰¥ 25 FPS, latensi â‰¤ 400 ms |
+| O2 | Upload batch processing | 10 dokumen dalam â‰¤ 5 detik |
 | O3 | Dual pipeline storage (Public DMZ + Sovereign Vault) | Dapat diverifikasi via filesystem inspection |
 | O4 | Enkripsi data asli AES-256-GCM | Verifikasi via decrypt test |
 | O5 | Audit log lengkap | Setiap aksi tercatat dengan trace_id |
@@ -136,7 +136,7 @@ PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
 |---|---|---|
 | Esensi "Augmenting" | 30% | Narasi: "membebaskan pegawai sipil dari ketakutan human error"; demo skenario e-KYC |
 | Pengalaman Pengguna | 25% | Onboarding singkat, feedback visual instan, error messaging dalam Bahasa Indonesia |
-| Storytelling & Pitching | 25% | Pitch deck terstruktur (Crisis → Save → Sovereignty → Adaptation) |
+| Storytelling & Pitching | 25% | Pitch deck terstruktur (Crisis â†’ Save â†’ Sovereignty â†’ Adaptation) |
 | Viabilitas Solusi | 20% | Roadmap 12 bulan dari proposal, model bisnis B2G+B2B+B2C, analisis kompetitor |
 
 ---
@@ -177,15 +177,15 @@ PrivAI Guard mengisi gap ini sebagai satu-satunya alternatif yang:
 
 Penting untuk membatasi diri agar tidak terjebak dalam *scope creep* selama 24 jam:
 
-- **Production-grade HSM integration** — disimulasikan dengan AES key di env (jelaskan di pitch)
-- **HashiCorp Vault, Keycloak, Prometheus, Grafana** — disimulasikan di MVP, dijelaskan di roadmap
-- **Mobile native app** — hanya browser-based responsive
-- **Multi-tenant authentication** — single user untuk demo
-- **Cloud deployment** — eksplisit dilarang panitia (localhost only)
-- **Model retraining** — eksplisit dilarang panitia (model dari Tahap 2)
-- **Real OCR engine** — sesuai proposal, deteksi murni visual (no Tesseract)
-- **PDF export laporan** — opsional jika waktu sisa
-- **Integrasi dengan platform spesifik (Zoom SDK, Meet API)** — hanya via virtual camera
+- **Production-grade HSM integration** â€” disimulasikan dengan AES key di env (jelaskan di pitch)
+- **HashiCorp Vault, Keycloak, Prometheus, Grafana** â€” disimulasikan di MVP, dijelaskan di roadmap
+- **Mobile native app** â€” hanya browser-based responsive
+- **Multi-tenant authentication** â€” single user untuk demo
+- **Cloud deployment** â€” eksplisit dilarang panitia (localhost only)
+- **Model retraining** â€” eksplisit dilarang panitia (model dari Tahap 2)
+- **Real OCR engine** â€” sesuai proposal, deteksi murni visual (no Tesseract)
+- **PDF export laporan** â€” opsional jika waktu sisa
+- **Integrasi dengan platform spesifik (Zoom SDK, Meet API)** â€” hanya via virtual camera
 
 ---
 
@@ -236,75 +236,75 @@ Saat demo, juri adalah *user* utama. Pengalaman mereka harus:
 ### 6.1 Diagram Arsitektur Tingkat Tinggi
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      USER DEVICE (LOCAL ONLY)                    │
-│                                                                  │
-│  ┌──────────────┐         ┌─────────────────────────────────┐  │
-│  │   FRONTEND   │  HTTP/  │           BACKEND                │  │
-│  │  (React+Vite)│ WebSock │      (FastAPI + Uvicorn)         │  │
-│  │   :5173      ├────────►│           :8000                  │  │
-│  └──────┬───────┘         │                                   │  │
-│         │                 │  ┌─────────────────────────────┐ │  │
-│         │                 │  │      AI Service Layer       │ │  │
-│         │ WebRTC          │  │  - YOLO11n loader           │ │  │
-│         │ (camera)        │  │  - Inference engine         │ │  │
-│         │                 │  │  - Detection pipeline       │ │  │
-│         │                 │  └──────────────┬──────────────┘ │  │
-│         │                 │                 │                 │  │
-│         │                 │  ┌──────────────▼──────────────┐ │  │
-│         │                 │  │   Redaction Pipeline        │ │  │
-│         │                 │  │  - Strategy selector        │ │  │
-│         │                 │  │  - OpenCV operations        │ │  │
-│         │                 │  └──────────────┬──────────────┘ │  │
-│         │                 │                 │                 │  │
-│         │                 │     ┌───────────┴───────────┐    │  │
-│         │                 │     │                       │    │  │
-│         │                 │  ┌──▼──────────┐  ┌────────▼─┐ │  │
-│         │                 │  │  Public     │  │ Encryption│ │  │
-│         │                 │  │  Output     │  │  Service  │ │  │
-│         │                 │  │  (redacted) │  │ (AES-GCM) │ │  │
-│         │                 │  └──┬──────────┘  └──────┬────┘ │  │
-│         │                 │     │                    │      │  │
-│         │                 │  ┌──▼────────────────────▼────┐ │  │
-│         │                 │  │     Storage Layer          │ │  │
-│         │                 │  │  - SQLite (metadata)       │ │  │
-│         │                 │  │  - Filesystem (vault)      │ │  │
-│         │                 │  │  - MinIO (optional)        │ │  │
-│         │                 │  └────────────────────────────┘ │  │
-│         │                 │                                   │  │
-│         │                 │  ┌────────────────────────────┐  │  │
-│         │                 │  │     Audit Service          │  │  │
-│         │                 │  │  - Trace ID generator      │  │  │
-│         │                 │  │  - Event chain logger      │  │  │
-│         │                 │  └────────────────────────────┘  │  │
-│         │                 └───────────────────────────────────┘  │
-│         │                                                         │
-│  ┌──────▼─────────────────────────────────────────────────────┐ │
-│  │  Virtual Camera Bridge (Optional, pyvirtualcam)            │ │
-│  │  - Exposes "PrivAI Camera" to OS                           │ │
-│  │  - Routes safe stream to Zoom/Meet/etc.                    │ │
-│  └────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                      USER DEVICE (LOCAL ONLY)                    â”‚
+â”‚                                                                  â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚   FRONTEND   â”‚  HTTP/  â”‚           BACKEND                â”‚  â”‚
+â”‚  â”‚  (React+Vite)â”‚ WebSock â”‚      (FastAPI + Uvicorn)         â”‚  â”‚
+â”‚  â”‚   :5173      â”œâ”€â”€â”€â”€â”€â”€â”€â”€â–ºâ”‚           :8000                  â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”˜         â”‚                                   â”‚  â”‚
+â”‚         â”‚                 â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚      AI Service Layer       â”‚ â”‚  â”‚
+â”‚         â”‚ WebRTC          â”‚  â”‚  - YOLO11n loader           â”‚ â”‚  â”‚
+â”‚         â”‚ (camera)        â”‚  â”‚  - Inference engine         â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - Detection pipeline       â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚  â”‚
+â”‚         â”‚                 â”‚                 â”‚                 â”‚  â”‚
+â”‚         â”‚                 â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚   Redaction Pipeline        â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - Strategy selector        â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - OpenCV operations        â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚  â”‚
+â”‚         â”‚                 â”‚                 â”‚                 â”‚  â”‚
+â”‚         â”‚                 â”‚     â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”‚  â”‚
+â”‚         â”‚                 â”‚     â”‚                       â”‚    â”‚  â”‚
+â”‚         â”‚                 â”‚  â”Œâ”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â” â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  Public     â”‚  â”‚ Encryptionâ”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  Output     â”‚  â”‚  Service  â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  (redacted) â”‚  â”‚ (AES-GCM) â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â””â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”˜ â”‚  â”‚
+â”‚         â”‚                 â”‚     â”‚                    â”‚      â”‚  â”‚
+â”‚         â”‚                 â”‚  â”Œâ”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â” â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚     Storage Layer          â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - SQLite (metadata)       â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - Filesystem (vault)      â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - MinIO (optional)        â”‚ â”‚  â”‚
+â”‚         â”‚                 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚  â”‚
+â”‚         â”‚                 â”‚                                   â”‚  â”‚
+â”‚         â”‚                 â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚     Audit Service          â”‚  â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - Trace ID generator      â”‚  â”‚  â”‚
+â”‚         â”‚                 â”‚  â”‚  - Event chain logger      â”‚  â”‚  â”‚
+â”‚         â”‚                 â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚
+â”‚         â”‚                 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚         â”‚                                                         â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”‚
+â”‚  â”‚  Virtual Camera Bridge (Optional, pyvirtualcam)            â”‚ â”‚
+â”‚  â”‚  - Exposes "PrivAI Camera" to OS                           â”‚ â”‚
+â”‚  â”‚  - Routes safe stream to Zoom/Meet/etc.                    â”‚ â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â”‚
+â”‚                                                                  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-           ↑ ZERO outbound network traffic for sensitive data ↑
+           â†‘ ZERO outbound network traffic for sensitive data â†‘
 ```
 
 ### 6.2 Lapisan Arsitektur (Layered Architecture)
 
-**Layer 1 — Presentation Layer (Frontend)**
+**Layer 1 â€” Presentation Layer (Frontend)**
 - React + Vite + TypeScript
 - Komunikasi dengan backend via REST (sync) + WebSocket (live stream)
 - Komponen reusable dengan shadcn/ui
 - State management: React Context + Zustand untuk global state
 
-**Layer 2 — Application Layer (Backend Core)**
+**Layer 2 â€” Application Layer (Backend Core)**
 - FastAPI untuk routing dan validation
 - Pydantic models untuk request/response
 - Dependency injection untuk testability
 - Middleware chain untuk authentication, logging, audit
 
-**Layer 3 — Domain Services Layer**
+**Layer 3 â€” Domain Services Layer**
 - Detector Service (YOLO inference)
 - Redactor Service (OpenCV operations)
 - Encryptor Service (AES-256-GCM)
@@ -313,12 +313,12 @@ Saat demo, juri adalah *user* utama. Pengalaman mereka harus:
 - Risk Analyzer Service (scoring logic)
 - Config Manager (YAML + hot reload)
 
-**Layer 4 — Infrastructure Layer**
+**Layer 4 â€” Infrastructure Layer**
 - SQLite (default) / MySQL (optional) for metadata
 - Local filesystem (default) / MinIO (optional) for files
 - File-based YAML configuration
 
-**Layer 5 — Cross-cutting Concerns**
+**Layer 5 â€” Cross-cutting Concerns**
 - Logging (structured JSON via `structlog`)
 - Error handling (global exception handler)
 - Configuration management (Pydantic Settings)
@@ -351,12 +351,12 @@ Setiap fitur harus memikirkan: bagaimana ini ditunjukkan ke juri? Jika tidak ada
 ### 7.1 Prioritas Fitur
 
 Klasifikasi menggunakan **MoSCoW**:
-- **P0 (Must Have)** — wajib untuk MVP, tanpa ini demo gagal
-- **P1 (Should Have)** — sangat meningkatkan demo, kerjakan jika P0 selesai
-- **P2 (Could Have)** — polish, kerjakan jika ada sisa waktu
-- **P3 (Won't Have This Time)** — dijelaskan di pitch sebagai roadmap
+- **P0 (Must Have)** â€” wajib untuk MVP, tanpa ini demo gagal
+- **P1 (Should Have)** â€” sangat meningkatkan demo, kerjakan jika P0 selesai
+- **P2 (Could Have)** â€” polish, kerjakan jika ada sisa waktu
+- **P3 (Won't Have This Time)** â€” dijelaskan di pitch sebagai roadmap
 
-### 7.2 P0 — Must Have Features
+### 7.2 P0 â€” Must Have Features
 
 #### F1. Live Camera Detection
 **Deskripsi:** Pengguna mengaktifkan webcam, sistem mendeteksi objek sensitif *real-time* dan menampilkan dual-view (raw vs redacted).
@@ -370,10 +370,10 @@ Klasifikasi menggunakan **MoSCoW**:
 - Toggle jenis redaksi (blur/pixelate/black-box)
 
 **Acceptance Criteria:**
-- ✓ Deteksi terlihat di kedua mode (Privacy & Inspector)
-- ✓ FPS counter menunjukkan ≥ 15 FPS
-- ✓ Latency end-to-end ≤ 400 ms (dari capture ke render)
-- ✓ Toggle berfungsi tanpa restart stream
+- âœ“ Deteksi terlihat di kedua mode (Privacy & Inspector)
+- âœ“ FPS counter menunjukkan â‰¥ 15 FPS
+- âœ“ Latency end-to-end â‰¤ 400 ms (dari capture ke render)
+- âœ“ Toggle berfungsi tanpa restart stream
 
 #### F2. Upload & Scan
 **Deskripsi:** Pengguna upload gambar/video (single atau batch), sistem memprosesnya dan mengembalikan hasil.
@@ -387,10 +387,10 @@ Klasifikasi menggunakan **MoSCoW**:
 - Simpan ke vault terenkripsi
 
 **Acceptance Criteria:**
-- ✓ Single upload: hasil < 2 detik
-- ✓ Batch 10 file: hasil < 10 detik
-- ✓ Hasil tersimpan dengan trace_id
-- ✓ Audit log tercatat
+- âœ“ Single upload: hasil < 2 detik
+- âœ“ Batch 10 file: hasil < 10 detik
+- âœ“ Hasil tersimpan dengan trace_id
+- âœ“ Audit log tercatat
 
 #### F3. Dual Pipeline Storage
 **Deskripsi:** Setiap dokumen menghasilkan dua artifact: versi redacted (public) dan versi terenkripsi (sovereign vault).
@@ -402,9 +402,9 @@ Klasifikasi menggunakan **MoSCoW**:
 - Metadata tersimpan di SQLite
 
 **Acceptance Criteria:**
-- ✓ File ada di kedua lokasi setelah scan
-- ✓ Original tidak bisa dibuka tanpa decrypt
-- ✓ Verifikasi via test decrypt script
+- âœ“ File ada di kedua lokasi setelah scan
+- âœ“ Original tidak bisa dibuka tanpa decrypt
+- âœ“ Verifikasi via test decrypt script
 
 #### F4. Audit Logging
 **Deskripsi:** Setiap aksi penting tercatat dengan trace_id, timestamp, actor, dan metadata.
@@ -416,9 +416,9 @@ Klasifikasi menggunakan **MoSCoW**:
 - Exportable ke CSV/JSON
 
 **Acceptance Criteria:**
-- ✓ 1 scan = ≥ 5 audit entries dengan trace_id sama
-- ✓ Audit page menampilkan log terbaru real-time
-- ✓ Export CSV berfungsi
+- âœ“ 1 scan = â‰¥ 5 audit entries dengan trace_id sama
+- âœ“ Audit page menampilkan log terbaru real-time
+- âœ“ Export CSV berfungsi
 
 #### F5. Dynamic Configuration Engine
 **Deskripsi:** Seluruh perilaku kritis dikontrol via YAML config. Endpoint hot-reload tanpa restart server.
@@ -431,25 +431,25 @@ Klasifikasi menggunakan **MoSCoW**:
 - Versioning config (simpan history di DB)
 
 **Acceptance Criteria:**
-- ✓ Edit YAML → reload → behavior berubah tanpa restart
-- ✓ Config invalid → error message jelas, config lama tetap aktif
-- ✓ Endpoint `GET /api/config` menampilkan config aktif
+- âœ“ Edit YAML â†’ reload â†’ behavior berubah tanpa restart
+- âœ“ Config invalid â†’ error message jelas, config lama tetap aktif
+- âœ“ Endpoint `GET /api/config` menampilkan config aktif
 
 #### F6. Privacy Risk Score
 **Deskripsi:** Skor 0-100 yang merangkum tingkat risiko privasi berdasarkan deteksi.
 
 **Kebutuhan:**
-- Algoritma: bobot per kelas × confidence × jumlah deteksi
+- Algoritma: bobot per kelas Ã— confidence Ã— jumlah deteksi
 - Update real-time saat live mode
 - Breakdown alasan (kelas apa saja yang berkontribusi)
 - Skala visual: 0-25 Aman, 26-50 Waspada, 51-75 Berisiko, 76-100 Kritis
 
 **Acceptance Criteria:**
-- ✓ Score 0 saat tidak ada deteksi sensitif
-- ✓ Score 90+ saat KTP+wajah utama tertangkap
-- ✓ Breakdown menunjukkan minimal 2 alasan
+- âœ“ Score 0 saat tidak ada deteksi sensitif
+- âœ“ Score 90+ saat KTP+wajah utama tertangkap
+- âœ“ Breakdown menunjukkan minimal 2 alasan
 
-### 7.3 P1 — Should Have Features
+### 7.3 P1 â€” Should Have Features
 
 #### F7. Virtual Camera Bridge
 **Deskripsi:** PrivAI mendaftarkan diri sebagai sistem kamera virtual yang bisa dipilih di Zoom/Meet/OBS.
@@ -461,22 +461,22 @@ Klasifikasi menggunakan **MoSCoW**:
 - Indikator status di system tray (jika feasible)
 
 **Acceptance Criteria:**
-- ✓ "PrivAI Camera" muncul di list kamera Google Meet
-- ✓ Demo end-to-end: join meeting → KTP terdeteksi → blur sampai ke peserta lain
+- âœ“ "PrivAI Camera" muncul di list kamera Google Meet
+- âœ“ Demo end-to-end: join meeting â†’ KTP terdeteksi â†’ blur sampai ke peserta lain
 
 #### F8. Demo Storytelling Presets
 **Deskripsi:** 3 skenario demo otomatis yang bisa dijalankan tanpa setup manual.
 
 **Kebutuhan:**
-- Preset 1: "Skenario e-KYC Dukcapil" — auto-play video pre-recorded
-- Preset 2: "Batch Pelayanan Loket" — auto-load 8 sample documents
-- Preset 3: "Live Webcam Demo" — switch ke kamera asli
+- Preset 1: "Skenario e-KYC Dukcapil" â€” auto-play video pre-recorded
+- Preset 2: "Batch Pelayanan Loket" â€” auto-load 8 sample documents
+- Preset 3: "Live Webcam Demo" â€” switch ke kamera asli
 - Tombol "Mulai Skenario" di Beranda
 
 **Acceptance Criteria:**
-- ✓ Setiap preset jalan dalam 1 klik
-- ✓ Preset video terstandarisasi (durasi, isi, hasil)
-- ✓ Backup demo jika webcam venue gagal
+- âœ“ Setiap preset jalan dalam 1 klik
+- âœ“ Preset video terstandarisasi (durasi, isi, hasil)
+- âœ“ Backup demo jika webcam venue gagal
 
 #### F9. Model Integrity Verification
 **Deskripsi:** Endpoint dan UI footer yang membuktikan model sama dengan Tahap 2.
@@ -487,8 +487,8 @@ Klasifikasi menggunakan **MoSCoW**:
 - Bisa di-screenshot oleh juri untuk verifikasi
 
 **Acceptance Criteria:**
-- ✓ Hash sesuai dengan model yang submitted Tahap 2
-- ✓ Footer terlihat di semua halaman
+- âœ“ Hash sesuai dengan model yang submitted Tahap 2
+- âœ“ Footer terlihat di semua halaman
 
 #### F10. Performance Monitoring Panel
 **Deskripsi:** Panel diagnostik yang menampilkan metrics sistem real-time.
@@ -500,19 +500,19 @@ Klasifikasi menggunakan **MoSCoW**:
 - Endpoint `GET /api/metrics` dalam format Prometheus-compatible (untuk demo skalabilitas)
 
 **Acceptance Criteria:**
-- ✓ Panel terlihat di Inspector mode
-- ✓ Metrics update setiap 1 detik
-- ✓ Tidak menambah latency > 5%
+- âœ“ Panel terlihat di Inspector mode
+- âœ“ Metrics update setiap 1 detik
+- âœ“ Tidak menambah latency > 5%
 
-### 7.4 P2 — Could Have Features
+### 7.4 P2 â€” Could Have Features
 
-- **F11. Edge Case Gallery** — folder `demo/edge-cases/` dengan 7 gambar challenging untuk live Q&A
-- **F12. Audit Log Enrichment** — IP address, User-Agent, geo-info (dummy)
-- **F13. Bulk Export Report** — generate PDF audit report
-- **F14. Configuration UI Editor** — edit YAML via UI dengan validation
-- **F15. Trust & Security Page** — halaman publik menjelaskan arsitektur keamanan
+- **F11. Edge Case Gallery** â€” folder `demo/edge-cases/` dengan 7 gambar challenging untuk live Q&A
+- **F12. Audit Log Enrichment** â€” IP address, User-Agent, geo-info (dummy)
+- **F13. Bulk Export Report** â€” generate PDF audit report
+- **F14. Configuration UI Editor** â€” edit YAML via UI dengan validation
+- **F15. Trust & Security Page** â€” halaman publik menjelaskan arsitektur keamanan
 
-### 7.5 P3 — Won't Have This Time (Jelaskan di Roadmap)
+### 7.5 P3 â€” Won't Have This Time (Jelaskan di Roadmap)
 
 - Real HSM integration (Thales/NitroKey)
 - HashiCorp Vault production
@@ -530,12 +530,12 @@ Klasifikasi menggunakan **MoSCoW**:
 
 | Metrik | Target | Bagaimana Diukur |
 |---|---|---|
-| Inference latency (single image, CPU) | ≤ 300 ms | Backend log per request |
-| End-to-end live latency | ≤ 400 ms | Frame timestamp diff |
-| Live stream FPS | ≥ 15 FPS | Frontend FPS counter |
-| API response time (non-AI endpoints) | ≤ 100 ms | FastAPI middleware |
-| Frontend initial load | ≤ 2 seconds | Lighthouse |
-| Batch processing (10 images) | ≤ 10 seconds | Wall clock |
+| Inference latency (single image, CPU) | â‰¤ 300 ms | Backend log per request |
+| End-to-end live latency | â‰¤ 400 ms | Frame timestamp diff |
+| Live stream FPS | â‰¥ 15 FPS | Frontend FPS counter |
+| API response time (non-AI endpoints) | â‰¤ 100 ms | FastAPI middleware |
+| Frontend initial load | â‰¤ 2 seconds | Lighthouse |
+| Batch processing (10 images) | â‰¤ 10 seconds | Wall clock |
 
 ### 8.2 Security Requirements
 
@@ -566,10 +566,10 @@ Klasifikasi menggunakan **MoSCoW**:
 
 ### 8.5 Maintainability Requirements
 
-- Code coverage testing: target ≥ 60% untuk core services
+- Code coverage testing: target â‰¥ 60% untuk core services
 - Linting: Black + Ruff untuk Python, ESLint + Prettier untuk TypeScript
 - Documentation: setiap public function punya docstring
-- Modular: setiap file ≤ 300 baris
+- Modular: setiap file â‰¤ 300 baris
 
 ### 8.6 Portability Requirements
 
@@ -627,115 +627,115 @@ Klasifikasi menggunakan **MoSCoW**:
 ### 9.2 Folder Convention
 
 ```
-privai-guard/
-├── README.md                    # Quick start guide
-├── ARCHITECTURE.md              # System architecture & decisions
-├── INJECTION_POINTS.md          # Extension points untuk juri SE
-├── FAQ.md                       # Q&A preparation
-├── docker-compose.yml           # Optional MySQL+MinIO setup
-├── Makefile                     # Common commands
-├── .env.example                 # Environment template
-├── config/
-│   ├── runtime.yaml             # Main configuration (HOT RELOADABLE)
-│   ├── runtime.schema.yaml      # JSON Schema for validation
-│   └── presets/                 # Demo storytelling presets
-│       ├── ekyc-scenario.yaml
-│       ├── batch-scenario.yaml
-│       └── live-scenario.yaml
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI entry
-│   │   ├── config.py            # Settings loader
-│   │   ├── dependencies.py      # DI setup
-│   │   ├── api/                 # Route handlers
-│   │   │   ├── scan.py
-│   │   │   ├── documents.py
-│   │   │   ├── dashboard.py
-│   │   │   ├── audit.py
-│   │   │   ├── health.py
-│   │   │   ├── admin.py         # Config management
-│   │   │   └── websocket.py     # Live stream handler
-│   │   ├── services/            # Domain services
-│   │   │   ├── detector.py
-│   │   │   ├── redactor.py
-│   │   │   ├── encryptor.py
-│   │   │   ├── vault.py
-│   │   │   ├── audit_service.py
-│   │   │   ├── risk_analyzer.py
-│   │   │   └── config_manager.py
-│   │   ├── plugins/             # EXTENSION POINTS
-│   │   │   ├── detectors/       # Drop new detector here
-│   │   │   ├── validators/      # Drop new validator here
-│   │   │   ├── preprocessors/   # Drop new preprocessor here
-│   │   │   └── postprocessors/  # Drop new postprocessor here
-│   │   ├── models/              # SQLAlchemy + Pydantic
-│   │   │   ├── db_models.py
-│   │   │   └── schemas.py
-│   │   ├── middlewares/         # Cross-cutting
-│   │   │   ├── audit_middleware.py
-│   │   │   ├── cors.py
-│   │   │   └── error_handler.py
-│   │   └── utils/
-│   │       ├── logger.py
-│   │       └── crypto.py
-│   ├── models/                  # AI model files
-│   │   └── model_deteksi.pt     # FROM TAHAP 2 (do not retrain!)
-│   ├── data/                    # Runtime data (gitignored)
-│   │   ├── privai.db
-│   │   ├── public-redacted/
-│   │   └── sovereign-vault/
-│   ├── tests/
-│   │   ├── unit/
-│   │   ├── integration/
-│   │   └── fixtures/
-│   ├── requirements.txt
-│   └── pyproject.toml
-├── frontend/
-│   ├── src/
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   ├── routes.tsx
-│   │   ├── pages/
-│   │   │   ├── Home.tsx
-│   │   │   ├── PrivacyScanner.tsx
-│   │   │   ├── LiveCamera.tsx
-│   │   │   ├── GovernmentVault.tsx
-│   │   │   └── Dashboard.tsx
-│   │   ├── components/
-│   │   │   ├── ui/              # shadcn components
-│   │   │   ├── ScannedImage.tsx
-│   │   │   ├── DetectionBreakdown.tsx
-│   │   │   ├── PrivacyScore.tsx
-│   │   │   ├── RiskBadge.tsx
-│   │   │   ├── UploadBox.tsx
-│   │   │   ├── AuditLogList.tsx
-│   │   │   ├── PerformancePanel.tsx
-│   │   │   └── ConfigViewer.tsx
-│   │   ├── hooks/
-│   │   │   ├── useWebSocket.ts
-│   │   │   ├── useCamera.ts
-│   │   │   └── usePrivacyScore.ts
-│   │   ├── lib/
-│   │   │   ├── api.ts
-│   │   │   └── utils.ts
-│   │   └── store/
-│   │       └── globalStore.ts
-│   ├── public/
-│   │   └── demo-presets/        # Pre-recorded demo videos
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tailwind.config.js
-├── demo/
-│   ├── edge-cases/              # 7 challenging images
-│   ├── presentation/
-│   │   ├── pitch-deck.pdf
-│   │   └── architecture-diagram.png
-│   └── scripts/
-│       ├── benchmark.py         # Performance benchmark
-│       └── verify-model.py      # Model integrity check
-└── scripts/
-    ├── setup.sh                 # One-shot setup
-    └── reset-db.sh
+privai/
+â”œâ”€â”€ README.md                    # Quick start guide
+â”œâ”€â”€ ARCHITECTURE.md              # System architecture & decisions
+â”œâ”€â”€ INJECTION_POINTS.md          # Extension points untuk juri SE
+â”œâ”€â”€ FAQ.md                       # Q&A preparation
+â”œâ”€â”€ docker-compose.yml           # Optional MySQL+MinIO setup
+â”œâ”€â”€ Makefile                     # Common commands
+â”œâ”€â”€ .env.example                 # Environment template
+â”œâ”€â”€ config/
+â”‚   â”œâ”€â”€ runtime.yaml             # Main configuration (HOT RELOADABLE)
+â”‚   â”œâ”€â”€ runtime.schema.yaml      # JSON Schema for validation
+â”‚   â””â”€â”€ presets/                 # Demo storytelling presets
+â”‚       â”œâ”€â”€ ekyc-scenario.yaml
+â”‚       â”œâ”€â”€ batch-scenario.yaml
+â”‚       â””â”€â”€ live-scenario.yaml
+â”œâ”€â”€ backend/
+â”‚   â”œâ”€â”€ app/
+â”‚   â”‚   â”œâ”€â”€ main.py              # FastAPI entry
+â”‚   â”‚   â”œâ”€â”€ config.py            # Settings loader
+â”‚   â”‚   â”œâ”€â”€ dependencies.py      # DI setup
+â”‚   â”‚   â”œâ”€â”€ api/                 # Route handlers
+â”‚   â”‚   â”‚   â”œâ”€â”€ scan.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ documents.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ dashboard.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ audit.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ health.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ admin.py         # Config management
+â”‚   â”‚   â”‚   â””â”€â”€ websocket.py     # Live stream handler
+â”‚   â”‚   â”œâ”€â”€ services/            # Domain services
+â”‚   â”‚   â”‚   â”œâ”€â”€ detector.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ redactor.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ encryptor.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ vault.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ audit_service.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ risk_analyzer.py
+â”‚   â”‚   â”‚   â””â”€â”€ config_manager.py
+â”‚   â”‚   â”œâ”€â”€ plugins/             # EXTENSION POINTS
+â”‚   â”‚   â”‚   â”œâ”€â”€ detectors/       # Drop new detector here
+â”‚   â”‚   â”‚   â”œâ”€â”€ validators/      # Drop new validator here
+â”‚   â”‚   â”‚   â”œâ”€â”€ preprocessors/   # Drop new preprocessor here
+â”‚   â”‚   â”‚   â””â”€â”€ postprocessors/  # Drop new postprocessor here
+â”‚   â”‚   â”œâ”€â”€ models/              # SQLAlchemy + Pydantic
+â”‚   â”‚   â”‚   â”œâ”€â”€ db_models.py
+â”‚   â”‚   â”‚   â””â”€â”€ schemas.py
+â”‚   â”‚   â”œâ”€â”€ middlewares/         # Cross-cutting
+â”‚   â”‚   â”‚   â”œâ”€â”€ audit_middleware.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ cors.py
+â”‚   â”‚   â”‚   â””â”€â”€ error_handler.py
+â”‚   â”‚   â””â”€â”€ utils/
+â”‚   â”‚       â”œâ”€â”€ logger.py
+â”‚   â”‚       â””â”€â”€ crypto.py
+â”‚   â”œâ”€â”€ models/                  # AI model files
+â”‚   â”‚   â””â”€â”€ model_deteksi.pt     # FROM TAHAP 2 (do not retrain!)
+â”‚   â”œâ”€â”€ data/                    # Runtime data (gitignored)
+â”‚   â”‚   â”œâ”€â”€ privai.db
+â”‚   â”‚   â”œâ”€â”€ public-redacted/
+â”‚   â”‚   â””â”€â”€ sovereign-vault/
+â”‚   â”œâ”€â”€ tests/
+â”‚   â”‚   â”œâ”€â”€ unit/
+â”‚   â”‚   â”œâ”€â”€ integration/
+â”‚   â”‚   â””â”€â”€ fixtures/
+â”‚   â”œâ”€â”€ requirements.txt
+â”‚   â””â”€â”€ pyproject.toml
+â”œâ”€â”€ frontend/
+â”‚   â”œâ”€â”€ src/
+â”‚   â”‚   â”œâ”€â”€ main.tsx
+â”‚   â”‚   â”œâ”€â”€ App.tsx
+â”‚   â”‚   â”œâ”€â”€ routes.tsx
+â”‚   â”‚   â”œâ”€â”€ pages/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Home.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ PrivacyScanner.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ LiveCamera.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ GovernmentVault.tsx
+â”‚   â”‚   â”‚   â””â”€â”€ Dashboard.tsx
+â”‚   â”‚   â”œâ”€â”€ components/
+â”‚   â”‚   â”‚   â”œâ”€â”€ ui/              # shadcn components
+â”‚   â”‚   â”‚   â”œâ”€â”€ ScannedImage.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ DetectionBreakdown.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ PrivacyScore.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ RiskBadge.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ UploadBox.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ AuditLogList.tsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ PerformancePanel.tsx
+â”‚   â”‚   â”‚   â””â”€â”€ ConfigViewer.tsx
+â”‚   â”‚   â”œâ”€â”€ hooks/
+â”‚   â”‚   â”‚   â”œâ”€â”€ useWebSocket.ts
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCamera.ts
+â”‚   â”‚   â”‚   â””â”€â”€ usePrivacyScore.ts
+â”‚   â”‚   â”œâ”€â”€ lib/
+â”‚   â”‚   â”‚   â”œâ”€â”€ api.ts
+â”‚   â”‚   â”‚   â””â”€â”€ utils.ts
+â”‚   â”‚   â””â”€â”€ store/
+â”‚   â”‚       â””â”€â”€ globalStore.ts
+â”‚   â”œâ”€â”€ public/
+â”‚   â”‚   â””â”€â”€ demo-presets/        # Pre-recorded demo videos
+â”‚   â”œâ”€â”€ package.json
+â”‚   â”œâ”€â”€ vite.config.ts
+â”‚   â””â”€â”€ tailwind.config.js
+â”œâ”€â”€ demo/
+â”‚   â”œâ”€â”€ edge-cases/              # 7 challenging images
+â”‚   â”œâ”€â”€ presentation/
+â”‚   â”‚   â”œâ”€â”€ pitch-deck.pdf
+â”‚   â”‚   â””â”€â”€ architecture-diagram.png
+â”‚   â””â”€â”€ scripts/
+â”‚       â”œâ”€â”€ benchmark.py         # Performance benchmark
+â”‚       â””â”€â”€ verify-model.py      # Model integrity check
+â””â”€â”€ scripts/
+    â”œâ”€â”€ setup.sh                 # One-shot setup
+    â””â”€â”€ reset-db.sh
 ```
 
 ### 9.3 Environment Variables
@@ -749,7 +749,7 @@ APP_HOST=0.0.0.0
 APP_PORT=8000
 
 # AI
-AI_MODE=real                    # 'real' or 'mock' — DEFAULT real, mock for emergency only
+AI_MODE=real                    # 'real' or 'mock' â€” DEFAULT real, mock for emergency only
 MODEL_PATH=./models/model_deteksi.pt
 DEVICE=cpu                      # cpu or cuda
 INFERENCE_THREADS=4
@@ -768,7 +768,7 @@ MINIO_ACCESS_KEY=...
 MINIO_SECRET_KEY=...
 
 # Encryption
-KEK_BASE64=...                  # Master key — in production: from HSM
+KEK_BASE64=...                  # Master key â€” in production: from HSM
 
 # Features
 FEATURE_VIRTUAL_CAMERA=true
@@ -790,60 +790,60 @@ AUDIT_ENABLE_IP_LOGGING=true
 ### 10.1 Entity Relationship Diagram (Logical)
 
 ```
-┌─────────────────┐         ┌─────────────────┐
-│    Document     │ 1     N │   Detection     │
-│─────────────────│◄────────│─────────────────│
-│ id (PK)         │         │ id (PK)         │
-│ filename        │         │ document_id(FK) │
-│ file_type       │         │ class_name      │
-│ overall_risk    │         │ confidence      │
-│ privacy_score   │         │ bbox (JSON)     │
-│ inference_time  │         │ risk_level      │
-│ status          │         │ created_at      │
-│ trace_id        │         └─────────────────┘
-│ created_at      │
-└────────┬────────┘
-         │
-         │ 1
-         │
-         │ N
-┌────────▼────────┐
-│   AuditLog      │
-│─────────────────│
-│ id (PK)         │
-│ trace_id        │
-│ action          │
-│ actor           │
-│ resource_id(FK) │
-│ metadata (JSON) │
-│ ip_address      │
-│ user_agent      │
-│ timestamp       │
-└─────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚    Document     â”‚ 1     N â”‚   Detection     â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚â—„â”€â”€â”€â”€â”€â”€â”€â”€â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ id (PK)         â”‚         â”‚ id (PK)         â”‚
+â”‚ filename        â”‚         â”‚ document_id(FK) â”‚
+â”‚ file_type       â”‚         â”‚ class_name      â”‚
+â”‚ overall_risk    â”‚         â”‚ confidence      â”‚
+â”‚ privacy_score   â”‚         â”‚ bbox (JSON)     â”‚
+â”‚ inference_time  â”‚         â”‚ risk_level      â”‚
+â”‚ status          â”‚         â”‚ created_at      â”‚
+â”‚ trace_id        â”‚         â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+â”‚ created_at      â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+         â”‚
+         â”‚ 1
+         â”‚
+         â”‚ N
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   AuditLog      â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ id (PK)         â”‚
+â”‚ trace_id        â”‚
+â”‚ action          â”‚
+â”‚ actor           â”‚
+â”‚ resource_id(FK) â”‚
+â”‚ metadata (JSON) â”‚
+â”‚ ip_address      â”‚
+â”‚ user_agent      â”‚
+â”‚ timestamp       â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-┌─────────────────────────┐
-│   ConfigVersion         │
-│─────────────────────────│
-│ id (PK)                 │
-│ version (int)           │
-│ config_yaml (text)      │
-│ schema_version          │
-│ activated_at            │
-│ deactivated_at (null)   │
-│ activated_by            │
-└─────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   ConfigVersion         â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ id (PK)                 â”‚
+â”‚ version (int)           â”‚
+â”‚ config_yaml (text)      â”‚
+â”‚ schema_version          â”‚
+â”‚ activated_at            â”‚
+â”‚ deactivated_at (null)   â”‚
+â”‚ activated_by            â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-┌─────────────────────────┐
-│   AccessRequest         │
-│─────────────────────────│
-│ id (PK)                 │
-│ document_id (FK)        │
-│ requester               │
-│ reason                  │
-│ status                  │ ('pending'/'approved'/'denied')
-│ requested_at            │
-│ resolved_at (null)      │
-└─────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   AccessRequest         â”‚
+â”‚â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”‚
+â”‚ id (PK)                 â”‚
+â”‚ document_id (FK)        â”‚
+â”‚ requester               â”‚
+â”‚ reason                  â”‚
+â”‚ status                  â”‚ ('pending'/'approved'/'denied')
+â”‚ requested_at            â”‚
+â”‚ resolved_at (null)      â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### 10.2 SQLAlchemy Models (Python)
@@ -1022,15 +1022,15 @@ Response (200):
 
 #### 11.1.2 Document Management
 
-**`GET /api/documents`** — List dokumen dengan paginasi
+**`GET /api/documents`** â€” List dokumen dengan paginasi
 ```
 Query params: page, limit, risk_filter, date_from, date_to
 Response: { items: [...], total, page, limit }
 ```
 
-**`GET /api/documents/{id}`** — Detail dokumen + deteksi
-**`GET /api/documents/{id}/redacted`** — Stream file redacted
-**`POST /api/documents/{id}/request-original-access`** — Buat access request
+**`GET /api/documents/{id}`** â€” Detail dokumen + deteksi
+**`GET /api/documents/{id}/redacted`** â€” Stream file redacted
+**`POST /api/documents/{id}/request-original-access`** â€” Buat access request
 
 #### 11.1.3 Dashboard
 
@@ -1054,8 +1054,8 @@ Response:
 
 #### 11.1.4 Audit
 
-**`GET /api/audit-logs`** — Paginasi audit log
-**`GET /api/audit-logs/export`** — Export ke CSV/JSON
+**`GET /api/audit-logs`** â€” Paginasi audit log
+**`GET /api/audit-logs/export`** â€” Export ke CSV/JSON
 
 #### 11.1.5 Health & Integrity
 
@@ -1070,7 +1070,7 @@ Response:
 }
 ```
 
-**`GET /api/health/model`** ⭐ untuk integrity verification
+**`GET /api/health/model`** â­ untuk integrity verification
 ```
 Response:
 {
@@ -1085,14 +1085,14 @@ Response:
 }
 ```
 
-**`GET /api/metrics`** — Prometheus-compatible metrics
+**`GET /api/metrics`** â€” Prometheus-compatible metrics
 
 #### 11.1.6 Configuration Management
 
-**`GET /api/config`** — Current active config
-**`GET /api/config/history`** — Version history
-**`POST /api/admin/reload-config`** — Hot reload from `config/runtime.yaml`
-**`POST /api/admin/inject`** ⭐ untuk Dynamic Injection
+**`GET /api/config`** â€” Current active config
+**`GET /api/config/history`** â€” Version history
+**`POST /api/admin/reload-config`** â€” Hot reload from `config/runtime.yaml`
+**`POST /api/admin/inject`** â­ untuk Dynamic Injection
 ```
 Request:
 {
@@ -1115,12 +1115,12 @@ Response:
 
 ### 11.2 WebSocket Endpoints
 
-**`WS /ws/stream`** — Bidirectional live stream
+**`WS /ws/stream`** â€” Bidirectional live stream
 ```
-Client → Server: { type: "frame", frame_base64: "...", config: {...} }
-Server → Client: { type: "result", detections: [...], redacted_frame: "...", metrics: {...} }
-Server → Client: { type: "error", message: "..." }
-Server → Client: { type: "config_changed", new_version: 5 }
+Client â†’ Server: { type: "frame", frame_base64: "...", config: {...} }
+Server â†’ Client: { type: "result", detections: [...], redacted_frame: "...", metrics: {...} }
+Server â†’ Client: { type: "error", message: "..." }
+Server â†’ Client: { type: "config_changed", new_version: 5 }
 ```
 
 ---
@@ -1163,7 +1163,7 @@ Server → Client: { type: "config_changed", new_version: 5 }
 **Lokasi config:** `audit.fields` dan `audit.format`
 **Cara respond:**
 1. Update field list di YAML
-2. Hot reload — sistem akan mulai catat field baru untuk event setelahnya
+2. Hot reload â€” sistem akan mulai catat field baru untuk event setelahnya
 3. Untuk field yang requires computation, tambah handler di `plugins/audit/`
 
 #### EP5. Input Source
@@ -1357,12 +1357,12 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** Ultralytics, PyTorch, OpenCV
 **Effort:** 4 jam (sudah ada di practice run, perlu refactor untuk config-driven)
 **Acceptance:**
-- ✓ Load model dari path yang dispesifikasi config
-- ✓ Filter kelas berdasarkan `detection.classes` aktif di config
-- ✓ Filter berdasarkan `confidence_threshold` dinamis
-- ✓ Return latency per inference
-- ✓ Support batch processing
-- ✓ Thread-safe untuk concurrent requests
+- âœ“ Load model dari path yang dispesifikasi config
+- âœ“ Filter kelas berdasarkan `detection.classes` aktif di config
+- âœ“ Filter berdasarkan `confidence_threshold` dinamis
+- âœ“ Return latency per inference
+- âœ“ Support batch processing
+- âœ“ Thread-safe untuk concurrent requests
 
 #### C2. Redactor Service
 **File:** `backend/app/services/redactor.py`
@@ -1372,10 +1372,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** OpenCV
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ Support 3 jenis redaksi (blur, pixelate, blackbox)
-- ✓ Padding configurable
-- ✓ Per-class override berfungsi
-- ✓ Plugin loader untuk redaksi custom
+- âœ“ Support 3 jenis redaksi (blur, pixelate, blackbox)
+- âœ“ Padding configurable
+- âœ“ Per-class override berfungsi
+- âœ“ Plugin loader untuk redaksi custom
 
 #### C3. Encryptor Service
 **File:** `backend/app/services/encryptor.py`
@@ -1385,10 +1385,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** `cryptography` library
 **Effort:** 2 jam
 **Acceptance:**
-- ✓ Setiap file punya DEK unik
-- ✓ DEK di-wrap dengan KEK (master)
-- ✓ Decrypt test lulus
-- ✓ Tidak ada key dalam plaintext di disk
+- âœ“ Setiap file punya DEK unik
+- âœ“ DEK di-wrap dengan KEK (master)
+- âœ“ Decrypt test lulus
+- âœ“ Tidak ada key dalam plaintext di disk
 
 #### C4. Vault Service
 **File:** `backend/app/services/vault.py`
@@ -1398,10 +1398,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** boto3 (minio), pathlib (fs)
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ Bisa swap backend via config tanpa code change
-- ✓ Public dan Vault terpisah lokasinya
-- ✓ Retrieval berfungsi
-- ✓ Error handling (disk full, network error)
+- âœ“ Bisa swap backend via config tanpa code change
+- âœ“ Public dan Vault terpisah lokasinya
+- âœ“ Retrieval berfungsi
+- âœ“ Error handling (disk full, network error)
 
 #### C5. Audit Service
 **File:** `backend/app/services/audit_service.py`
@@ -1411,10 +1411,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** SQLAlchemy
 **Effort:** 2 jam
 **Acceptance:**
-- ✓ Setiap action ter-record
-- ✓ Trace ID konsisten dalam 1 scan
-- ✓ Append-only (no UPDATE/DELETE)
-- ✓ Index untuk query cepat
+- âœ“ Setiap action ter-record
+- âœ“ Trace ID konsisten dalam 1 scan
+- âœ“ Append-only (no UPDATE/DELETE)
+- âœ“ Index untuk query cepat
 
 #### C6. Risk Analyzer
 **File:** `backend/app/services/risk_analyzer.py`
@@ -1424,10 +1424,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** -
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ Score 0 untuk no detection
-- ✓ Score 90+ untuk KTP+wajah
-- ✓ Breakdown menjelaskan kontribusi
-- ✓ Plugin rule support
+- âœ“ Score 0 untuk no detection
+- âœ“ Score 90+ untuk KTP+wajah
+- âœ“ Breakdown menjelaskan kontribusi
+- âœ“ Plugin rule support
 
 #### C7. Config Manager
 **File:** `backend/app/services/config_manager.py`
@@ -1437,10 +1437,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** PyYAML, Pydantic
 **Effort:** 4 jam
 **Acceptance:**
-- ✓ Validate dengan Pydantic schema
-- ✓ Hot reload tanpa restart
-- ✓ Versioning di DB
-- ✓ Emit event ke WebSocket
+- âœ“ Validate dengan Pydantic schema
+- âœ“ Hot reload tanpa restart
+- âœ“ Versioning di DB
+- âœ“ Emit event ke WebSocket
 
 #### C8. WebSocket Stream Handler
 **File:** `backend/app/api/websocket.py`
@@ -1450,10 +1450,10 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Dependensi:** FastAPI WebSocket
 **Effort:** 4 jam
 **Acceptance:**
-- ✓ ≥ 15 FPS sustained
-- ✓ Auto reconnect on disconnect
-- ✓ Backpressure handling (drop frames if backlog)
-- ✓ Audit log per session
+- âœ“ â‰¥ 15 FPS sustained
+- âœ“ Auto reconnect on disconnect
+- âœ“ Backpressure handling (drop frames if backlog)
+- âœ“ Audit log per session
 
 ### 13.2 Frontend Components
 
@@ -1462,68 +1462,68 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Tujuan:** Landing page dengan pitch + CTA + demo preset.
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ Hero dengan tagline + 3 CTA
-- ✓ 3 demo preset buttons functional
-- ✓ Mobile responsive
+- âœ“ Hero dengan tagline + 3 CTA
+- âœ“ 3 demo preset buttons functional
+- âœ“ Mobile responsive
 
 #### C10. Privacy Scanner Page
 **File:** `frontend/src/pages/PrivacyScanner.tsx`
 **Tujuan:** Upload single image, lihat hasil scan dengan visualisasi.
 **Effort:** 4 jam
 **Acceptance:**
-- ✓ Drag-drop functional
-- ✓ Bounding box overlay accurate
-- ✓ Risk explanation muncul
-- ✓ Download redacted bekerja
+- âœ“ Drag-drop functional
+- âœ“ Bounding box overlay accurate
+- âœ“ Risk explanation muncul
+- âœ“ Download redacted bekerja
 
 #### C11. Live Camera Page
 **File:** `frontend/src/pages/LiveCamera.tsx`
 **Tujuan:** Dual-mode live demo (Privacy/Inspector).
 **Effort:** 6 jam (komponen tersulit)
 **Acceptance:**
-- ✓ WebRTC camera access
-- ✓ WebSocket streaming ≥ 15 FPS
-- ✓ Mode toggle preserve stream
-- ✓ Recording .webm bekerja
-- ✓ Per-class filter live
-- ✓ Privacy Score real-time
+- âœ“ WebRTC camera access
+- âœ“ WebSocket streaming â‰¥ 15 FPS
+- âœ“ Mode toggle preserve stream
+- âœ“ Recording .webm bekerja
+- âœ“ Per-class filter live
+- âœ“ Privacy Score real-time
 
 #### C12. Government Vault Page
 **File:** `frontend/src/pages/GovernmentVault.tsx`
 **Tujuan:** Tabel registri dokumen + detail view.
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ Pagination berfungsi
-- ✓ Filter risk + date
-- ✓ Detail expand
-- ✓ Access request form
+- âœ“ Pagination berfungsi
+- âœ“ Filter risk + date
+- âœ“ Detail expand
+- âœ“ Access request form
 
 #### C13. Dashboard Page
 **File:** `frontend/src/pages/Dashboard.tsx`
 **Tujuan:** Stat cards + charts + audit log.
 **Effort:** 3 jam
 **Acceptance:**
-- ✓ 4 stat cards akurat
-- ✓ Bar chart class distribution
-- ✓ Audit log list paginated
+- âœ“ 4 stat cards akurat
+- âœ“ Bar chart class distribution
+- âœ“ Audit log list paginated
 
 #### C14. PrivacyScore Component
 **File:** `frontend/src/components/PrivacyScore.tsx`
 **Tujuan:** Ring chart + breakdown explanation.
 **Effort:** 2 jam
 **Acceptance:**
-- ✓ Animasi smooth saat update
-- ✓ Color-coded berdasarkan level
-- ✓ Breakdown clickable untuk detail
+- âœ“ Animasi smooth saat update
+- âœ“ Color-coded berdasarkan level
+- âœ“ Breakdown clickable untuk detail
 
 #### C15. Performance Panel Component
 **File:** `frontend/src/components/PerformancePanel.tsx`
 **Tujuan:** Display FPS, latency, CPU, memory live.
 **Effort:** 2 jam
 **Acceptance:**
-- ✓ Update setiap 1 detik
-- ✓ Sparkline untuk trend
-- ✓ Tidak menambah latency
+- âœ“ Update setiap 1 detik
+- âœ“ Sparkline untuk trend
+- âœ“ Tidak menambah latency
 
 ### 13.3 Infrastructure Components
 
@@ -1532,26 +1532,26 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 **Tujuan:** One-command bootstrap.
 **Effort:** 2 jam
 **Acceptance:**
-- ✓ `docker compose up` jalankan semua
-- ✓ Fallback ke native mode tersedia
-- ✓ Volume mount untuk model & data
+- âœ“ `docker compose up` jalankan semua
+- âœ“ Fallback ke native mode tersedia
+- âœ“ Volume mount untuk model & data
 
 #### C17. Database Migration
 **File:** `backend/alembic/`
 **Tujuan:** Schema management.
 **Effort:** 1 jam
 **Acceptance:**
-- ✓ Initial migration berfungsi
-- ✓ SQLite dan MySQL keduanya didukung
+- âœ“ Initial migration berfungsi
+- âœ“ SQLite dan MySQL keduanya didukung
 
 #### C18. Documentation
 **Files:** `README.md`, `ARCHITECTURE.md`, `INJECTION_POINTS.md`, `FAQ.md`
 **Effort:** 3 jam (paralel dengan dev)
 **Acceptance:**
-- ✓ README runnable steps
-- ✓ Architecture diagram embedded
-- ✓ Injection points didokumentasikan
-- ✓ FAQ minimal 15 Q&A
+- âœ“ README runnable steps
+- âœ“ Architecture diagram embedded
+- âœ“ Injection points didokumentasikan
+- âœ“ FAQ minimal 15 Q&A
 
 ### 13.4 Total Effort Estimate
 
@@ -1575,34 +1575,34 @@ Setiap komponen di-breakdown dengan: tujuan, input, output, dependensi, estimasi
 
 ```
 START
-  │
-  ├─► Buka laptop pagi hari
-  │
-  ├─► Klik shortcut "PrivAI Guard" di desktop
-  │
-  ├─► Aplikasi terbuka, status "Aktif"
-  │
-  ├─► Klik "Virtual Camera Mode: ON"
-  │
-  ├─► Buka Google Meet, ada appointment verifikasi
-  │
-  ├─► Di Meet, pilih kamera "PrivAI Camera"
-  │
-  ├─► Mulai meeting dengan warga
-  │
-  ├─► Warga tunjukkan KTP ke kamera
-  │   ├─► Officer lihat di Meet: KTP otomatis ter-blur (kecuali wajah utama)
-  │   └─► Audit log di PrivAI: 5 events tercatat
-  │
-  ├─► Officer butuh akses NIK untuk verifikasi
-  │   ├─► Klik "Request Original Access" di PrivAI
-  │   ├─► Isi alasan: "Verifikasi NIK appointment #12345"
-  │   ├─► Supervisor approve (simulasi)
-  │   └─► NIK ditampilkan, audit log update
-  │
-  ├─► Meeting selesai
-  │
-  └─► End of day: Officer review dashboard
+  â”‚
+  â”œâ”€â–º Buka laptop pagi hari
+  â”‚
+  â”œâ”€â–º Klik shortcut "PrivAI" di desktop
+  â”‚
+  â”œâ”€â–º Aplikasi terbuka, status "Aktif"
+  â”‚
+  â”œâ”€â–º Klik "Virtual Camera Mode: ON"
+  â”‚
+  â”œâ”€â–º Buka Google Meet, ada appointment verifikasi
+  â”‚
+  â”œâ”€â–º Di Meet, pilih kamera "PrivAI Camera"
+  â”‚
+  â”œâ”€â–º Mulai meeting dengan warga
+  â”‚
+  â”œâ”€â–º Warga tunjukkan KTP ke kamera
+  â”‚   â”œâ”€â–º Officer lihat di Meet: KTP otomatis ter-blur (kecuali wajah utama)
+  â”‚   â””â”€â–º Audit log di PrivAI: 5 events tercatat
+  â”‚
+  â”œâ”€â–º Officer butuh akses NIK untuk verifikasi
+  â”‚   â”œâ”€â–º Klik "Request Original Access" di PrivAI
+  â”‚   â”œâ”€â–º Isi alasan: "Verifikasi NIK appointment #12345"
+  â”‚   â”œâ”€â–º Supervisor approve (simulasi)
+  â”‚   â””â”€â–º NIK ditampilkan, audit log update
+  â”‚
+  â”œâ”€â–º Meeting selesai
+  â”‚
+  â””â”€â–º End of day: Officer review dashboard
          - 8 dokumen diproses
          - 0 kebocoran data
          - 12 access requests, semua tercatat
@@ -1631,22 +1631,22 @@ warga via Google Meet. Mari kita simulasikan."
 [Officer]: "Selamat pagi, Pak. Silakan tunjukkan KTP-nya."
 [Warga mengangkat KTP ke kamera]
 
-→ DI LAYAR MEET: KTP otomatis ter-blur dalam <300ms
-→ Wajah warga tetap terlihat (untuk verifikasi)
-→ Latency badge di pojok PrivAI: "234ms · 28 FPS"
+â†’ DI LAYAR MEET: KTP otomatis ter-blur dalam <300ms
+â†’ Wajah warga tetap terlihat (untuk verifikasi)
+â†’ Latency badge di pojok PrivAI: "234ms Â· 28 FPS"
 
-[Pitch Lead]: "Lihat — data sensitif sudah dicoret SEBELUM sampai ke server
+[Pitch Lead]: "Lihat â€” data sensitif sudah dicoret SEBELUM sampai ke server
 Google Meet. Latensi hanya 234 milidetik, 10x lebih cepat dari batas toleransi."
 
 [Klik tab PrivAI]
 [Buka Audit Log tab]
 
-[Pitch Lead]: "Setiap aksi tercatat. Lihat: UPLOAD → DETECT → REDACT →
-ENCRYPT → STORE_VAULT. Semua dengan trace ID sama. Inilah kepatuhan UU PDP."
+[Pitch Lead]: "Setiap aksi tercatat. Lihat: UPLOAD â†’ DETECT â†’ REDACT â†’
+ENCRYPT â†’ STORE_VAULT. Semua dengan trace ID sama. Inilah kepatuhan UU PDP."
 
 [Klik 'Sovereign Vault' tab]
 
-[Pitch Lead]: "Data asli? Tidak hilang — tapi dienkripsi AES-256.
+[Pitch Lead]: "Data asli? Tidak hilang â€” tapi dienkripsi AES-256.
 Bahkan kalau server jebol seperti insiden PDN, hasilnya cuma ciphertext."
 
 [Klik 1 dokumen]
@@ -1661,9 +1661,9 @@ Bahkan kalau server jebol seperti insiden PDN, hasilnya cuma ciphertext."
 [Buka Privacy Scanner page]
 [Drag-drop folder dengan 10 dokumen demo]
 
-→ Progress bar muncul
-→ Dalam <8 detik: 10 dokumen selesai diproses
-→ Tampil grid hasil dengan bounding box
+â†’ Progress bar muncul
+â†’ Dalam <8 detik: 10 dokumen selesai diproses
+â†’ Tampil grid hasil dengan bounding box
 
 [Pitch Lead]: "10 dokumen dalam 8 detik di CPU laptop biasa. 
 Tidak butuh GPU. Tidak butuh cloud. Tidak butuh internet."
@@ -1672,7 +1672,7 @@ Tidak butuh GPU. Tidak butuh cloud. Tidak butuh internet."
 [Tampilkan: original encrypted, redacted public, audit chain]
 ```
 
-#### Scenario C: "Dynamic Injection Response" (3 menit) ⭐
+#### Scenario C: "Dynamic Injection Response" (3 menit) â­
 
 ```
 [Pitch Lead]: "Tadi pagi jam 10, panitia menyuntikkan requirement
@@ -1688,12 +1688,12 @@ baru: 'Sistem harus mendeteksi tanda tangan juga.'"
 [Save]
 [Run: curl -X POST localhost:8000/api/admin/reload-config]
 
-→ Notification muncul di UI: "Config v2 active. 7 classes loaded."
-→ Audit log: CONFIG_RELOAD entry baru
+â†’ Notification muncul di UI: "Config v2 active. 7 classes loaded."
+â†’ Audit log: CONFIG_RELOAD entry baru
 
 [Demo: scan dokumen yang ada tanda tangan]
 
-→ Tanda tangan terdeteksi (jika model support) atau gracefully ignored
+â†’ Tanda tangan terdeteksi (jika model support) atau gracefully ignored
 
 [Pitch Lead]: "Arsitektur config-driven kami menjamin adaptasi tanpa
 downtime. Inilah Adaptive Intelligence yang dimaksud tema kompetisi ini."
@@ -1703,51 +1703,51 @@ downtime. Inilah Adaptive Intelligence yang dimaksud tema kompetisi ini."
 
 Siapkan jawaban + demo cepat untuk:
 
-1. **"Kalau pencahayaan buruk bagaimana?"** → Buka edge-case gallery, scan gambar low-light
-2. **"Bagaimana kalau ada wajah orang banyak?"** → Scan gambar dengan 10+ wajah
-3. **"Berapa CPU usage saat 30 FPS?"** → Buka Performance Panel, tampilkan grafik
-4. **"Apa bedanya dengan Google Vision?"** → Klik Trust & Security page, tabel perbandingan
+1. **"Kalau pencahayaan buruk bagaimana?"** â†’ Buka edge-case gallery, scan gambar low-light
+2. **"Bagaimana kalau ada wajah orang banyak?"** â†’ Scan gambar dengan 10+ wajah
+3. **"Berapa CPU usage saat 30 FPS?"** â†’ Buka Performance Panel, tampilkan grafik
+4. **"Apa bedanya dengan Google Vision?"** â†’ Klik Trust & Security page, tabel perbandingan
 
 ### 14.3 Screen Flow
 
 ```
 Home (Beranda)
-  ├─► CTA 1: "Coba Pindai" → Privacy Scanner
-  ├─► CTA 2: "Aktifkan Kamera" → Live Camera
-  ├─► CTA 3: "Lihat Dashboard" → Dashboard
-  └─► Demo Presets:
-        ├─► Preset e-KYC → Live Camera (auto-play)
-        ├─► Preset Batch → Privacy Scanner (auto-load files)
-        └─► Preset Live → Live Camera (use real webcam)
+  â”œâ”€â–º CTA 1: "Coba Pindai" â†’ Privacy Scanner
+  â”œâ”€â–º CTA 2: "Aktifkan Kamera" â†’ Live Camera
+  â”œâ”€â–º CTA 3: "Lihat Dashboard" â†’ Dashboard
+  â””â”€â–º Demo Presets:
+        â”œâ”€â–º Preset e-KYC â†’ Live Camera (auto-play)
+        â”œâ”€â–º Preset Batch â†’ Privacy Scanner (auto-load files)
+        â””â”€â–º Preset Live â†’ Live Camera (use real webcam)
 
 Privacy Scanner
-  ├─► Upload area
-  ├─► Hasil scan (image + bbox + breakdown)
-  └─► CTA: "Buka di Vault" → Government Vault (filtered to this doc)
+  â”œâ”€â–º Upload area
+  â”œâ”€â–º Hasil scan (image + bbox + breakdown)
+  â””â”€â–º CTA: "Buka di Vault" â†’ Government Vault (filtered to this doc)
 
 Live Camera
-  ├─► Mode toggle (Privacy / Inspector)
-  ├─► Stream area
-  ├─► Sidebar:
-  │    ├─► Privacy Score
-  │    ├─► Filter chips
-  │    └─► Settings
-  └─► Footer: Performance metrics
+  â”œâ”€â–º Mode toggle (Privacy / Inspector)
+  â”œâ”€â–º Stream area
+  â”œâ”€â–º Sidebar:
+  â”‚    â”œâ”€â–º Privacy Score
+  â”‚    â”œâ”€â–º Filter chips
+  â”‚    â””â”€â–º Settings
+  â””â”€â–º Footer: Performance metrics
 
 Government Vault
-  ├─► Document list (paginated)
-  ├─► Filter (risk, date, class)
-  ├─► Detail panel (expand)
-  └─► Access request modal
+  â”œâ”€â–º Document list (paginated)
+  â”œâ”€â–º Filter (risk, date, class)
+  â”œâ”€â–º Detail panel (expand)
+  â””â”€â–º Access request modal
 
 Dashboard
-  ├─► Stat cards
-  ├─► Charts (class distribution, timeline)
-  └─► Recent audit log (link to full)
+  â”œâ”€â–º Stat cards
+  â”œâ”€â–º Charts (class distribution, timeline)
+  â””â”€â–º Recent audit log (link to full)
 
 (global) Footer
-  ├─► Model integrity info (SHA256, params)
-  └─► Trust badges
+  â”œâ”€â–º Model integrity info (SHA256, params)
+  â””â”€â–º Trust badges
 ```
 
 ---
@@ -1782,81 +1782,81 @@ Dashboard
 
 ### 15.2 24-Hour Timeline (14-15 Mei 2026)
 
-#### Hari Pertama — 14 Mei 2026
+#### Hari Pertama â€” 14 Mei 2026
 
-**10:00 — Release Dynamic Injection**
+**10:00 â€” Release Dynamic Injection**
 Panitia umumkan injection. Tim **tidak boleh langsung koding**.
 
-**10:00–10:30: Decode Injection**
+**10:00â€“10:30: Decode Injection**
 - [ ] Baca injection bersama semua anggota
 - [ ] Identifikasi: kelas baru? policy baru? format baru?
 - [ ] Mapping ke extension point yang sudah ada
 - [ ] Plan response strategy
 
-**10:30–12:00: Architecture Lock**
+**10:30â€“12:00: Architecture Lock**
 - [ ] Update `config/runtime.yaml` untuk injection
 - [ ] Update API contract jika perlu
 - [ ] Buat task list di Trello/Notion
 - [ ] Assign tasks ke 5 anggota
-- [ ] **Code freeze contract — setelah jam 12:00 tidak ada perubahan struktur**
+- [ ] **Code freeze contract â€” setelah jam 12:00 tidak ada perubahan struktur**
 
-**12:00–13:00: Lunch + Initial Coding**
+**12:00â€“13:00: Lunch + Initial Coding**
 - [ ] Semua mulai parallel coding sesuai task
 - [ ] Standup mini: blocker?
 
-**13:00–18:00: Sprint 1 — Core Build**
+**13:00â€“18:00: Sprint 1 â€” Core Build**
 - AI Engineer: integrate injection ke detector
 - Backend: API endpoints + WebSocket + config manager
 - Frontend: Wire up UI dengan API mock
 - DevOps: Docker setup + virtual camera
 - Pitch Lead: Start pitch deck outline + record demo backup
 
-**18:00–19:00: Dinner + Integration Checkpoint**
+**18:00â€“19:00: Dinner + Integration Checkpoint**
 - [ ] Demo internal end-to-end (meskipun jelek)
 - [ ] Identifikasi bug & gap
 - [ ] Re-prioritize remaining tasks
 
-**19:00–02:00 (Hari Kedua): Sprint 2 — Polish & Edges**
+**19:00â€“02:00 (Hari Kedua): Sprint 2 â€” Polish & Edges**
 - [ ] Handle error cases
 - [ ] UX polish (loading states, error messages)
 - [ ] Audit log enrichment
 - [ ] Edge case testing
 - [ ] Demo storytelling presets
 
-#### Hari Kedua — 15 Mei 2026
+#### Hari Kedua â€” 15 Mei 2026
 
-**02:00–05:00: Sleep Rotation (WAJIB)**
+**02:00â€“05:00: Sleep Rotation (WAJIB)**
 - 3 anggota tidur 3 jam
 - 2 anggota stay (bug fixing ringan, dokumentasi)
 - 05:00: rotate
 
-**05:00–08:00: Stabilization**
+**05:00â€“08:00: Stabilization**
 - [ ] STOP fitur baru
 - [ ] Bug fixing only
 - [ ] Latihan demo 3 kali end-to-end
 - [ ] Update README, ARCHITECTURE.md, FAQ
 
-**08:00–10:00: Final Polish**
+**08:00â€“10:00: Final Polish**
 - [ ] Performance tuning
 - [ ] UI consistency check
 - [ ] Verify model integrity endpoint
 - [ ] Test pada laptop demo final
 
-**10:00–11:00: Final Lockdown**
+**10:00â€“11:00: Final Lockdown**
 - [ ] Final commit
 - [ ] Tag release `v1.0`
 - [ ] Push ke GitHub repo
 - [ ] Verifikasi repo clone & run
 
-**11:00: CODE FREEZE — TIDAK ADA TOLERANSI**
+**11:00: CODE FREEZE â€” TIDAK ADA TOLERANSI**
 
-**11:00–18:00: Pitch Deck Finalization**
+**11:00â€“18:00: Pitch Deck Finalization**
 - [ ] Slide-by-slide review
 - [ ] Latihan presentasi minimal 5 kali
 - [ ] Anticipate Q&A
 - [ ] Submit pitch deck sebelum deadline 15 Mei
 
-#### Hari Ketiga — 16 Mei 2026
+#### Hari Ketiga â€” 16 Mei 2026
 
 **09:00: Final Pitching & Live Demo**
 - [ ] Setup proyektor 15 menit sebelumnya
@@ -1882,12 +1882,12 @@ Panitia umumkan injection. Tim **tidak boleh langsung koding**.
 ### 15.4 Definition of Done (DoD)
 
 Sebuah komponen dianggap "selesai" jika:
-- ✓ Kode di-commit ke main branch
-- ✓ Manual test sukses pada minimal 1 anggota lain
-- ✓ Tidak ada console error
-- ✓ Audit log tercatat untuk action terkait
-- ✓ Berfungsi pada laptop demo
-- ✓ Tidak break fitur lain
+- âœ“ Kode di-commit ke main branch
+- âœ“ Manual test sukses pada minimal 1 anggota lain
+- âœ“ Tidak ada console error
+- âœ“ Audit log tercatat untuk action terkait
+- âœ“ Berfungsi pada laptop demo
+- âœ“ Tidak break fitur lain
 
 ---
 
@@ -1899,11 +1899,11 @@ Struktur folder sudah dirinci di [Section 9.2](#92-folder-convention). Berikut k
 
 ```
 main (protected)
-  ├─► feat/backend-detector-service
-  ├─► feat/frontend-live-camera
-  ├─► feat/virtual-camera-bridge
-  ├─► fix/audit-log-trace-id
-  └─► docs/architecture-update
+  â”œâ”€â–º feat/backend-detector-service
+  â”œâ”€â–º feat/frontend-live-camera
+  â”œâ”€â–º feat/virtual-camera-bridge
+  â”œâ”€â–º fix/audit-log-trace-id
+  â””â”€â–º docs/architecture-update
 ```
 
 **Convention commit messages:**
@@ -1992,13 +1992,13 @@ chore: update dependencies
 ### 17.2 Contingency Plans
 
 **Plan B untuk Live Demo:**
-- Jika webcam gagal → demo preset video 1
-- Jika WebSocket lag → switch ke upload mode dengan sample images
-- Jika model gagal load → mock mode (subtle, jangan kelihatan) + tegaskan ke juri "model tersedia di repo, sedang reload"
+- Jika webcam gagal â†’ demo preset video 1
+- Jika WebSocket lag â†’ switch ke upload mode dengan sample images
+- Jika model gagal load â†’ mock mode (subtle, jangan kelihatan) + tegaskan ke juri "model tersedia di repo, sedang reload"
 
 **Plan B untuk Dynamic Injection:**
-- Jika tidak bisa di-handle via config → emergency plugin (file Python baru di folder plugins)
-- Jika benar-benar tidak bisa → terbuka ke juri: "Kami implementasi sebagian, dokumentasi rencana lengkap di INJECTION_POINTS.md"
+- Jika tidak bisa di-handle via config â†’ emergency plugin (file Python baru di folder plugins)
+- Jika benar-benar tidak bisa â†’ terbuka ke juri: "Kami implementasi sebagian, dokumentasi rencana lengkap di INJECTION_POINTS.md"
 
 **Plan B untuk Pitch Deck:**
 - Selalu punya versi PDF (immutable) selain PPT
@@ -2013,21 +2013,21 @@ chore: update dependencies
 **Coverage Target:** 60% untuk core services
 
 **Priority files to test:**
-- `detector.py` — mock model output, test filtering
-- `redactor.py` — visual diff test
-- `encryptor.py` — encrypt/decrypt roundtrip
-- `risk_analyzer.py` — boundary cases (0 detections, max detections)
-- `config_manager.py` — invalid YAML, schema validation
+- `detector.py` â€” mock model output, test filtering
+- `redactor.py` â€” visual diff test
+- `encryptor.py` â€” encrypt/decrypt roundtrip
+- `risk_analyzer.py` â€” boundary cases (0 detections, max detections)
+- `config_manager.py` â€” invalid YAML, schema validation
 
 **Tools:** pytest, pytest-asyncio, httpx
 
 ### 18.2 Integration Tests
 
 **Skenario:**
-1. End-to-end scan: upload → detect → redact → encrypt → store → audit
-2. Hot reload: edit config → reload → verify behavior change
-3. WebSocket: connect → send 100 frames → verify response time
-4. Failure recovery: kill MinIO → verify fallback ke filesystem
+1. End-to-end scan: upload â†’ detect â†’ redact â†’ encrypt â†’ store â†’ audit
+2. Hot reload: edit config â†’ reload â†’ verify behavior change
+3. WebSocket: connect â†’ send 100 frames â†’ verify response time
+4. Failure recovery: kill MinIO â†’ verify fallback ke filesystem
 
 ### 18.3 Manual QA Checklist
 
@@ -2074,50 +2074,50 @@ Run sebelum hari-H dan saat code freeze.
 ### 19.1 Final Deliverables (Tahap 3)
 
 Sesuai guidebook:
-1. **Aplikasi MVP** — produk berfungsi penuh di laptop peserta
-2. **GitHub Repository Final** — source code lengkap (backend + frontend)
-3. **Pitch Deck** — slide untuk final pitching (PPT/PDF)
+1. **Aplikasi MVP** â€” produk berfungsi penuh di laptop peserta
+2. **GitHub Repository Final** â€” source code lengkap (backend + frontend)
+3. **Pitch Deck** â€” slide untuk final pitching (PPT/PDF)
 
 ### 19.2 Acceptance Criteria untuk MVP
 
 **Aplikasi dianggap "MVP siap demo" jika:**
 
-- ✓ Berjalan stabil minimal 30 menit tanpa crash
-- ✓ Live camera demo berjalan ≥ 15 FPS dengan latensi ≤ 400ms
-- ✓ Upload single + batch berfungsi
-- ✓ Dual pipeline (redacted + encrypted) terverifikasi
-- ✓ Audit log lengkap dengan trace_id
-- ✓ Privacy Score akurat real-time
-- ✓ Hot reload config tanpa restart
-- ✓ Dynamic Injection ter-handle (sesuai apa yang panitia kasih)
-- ✓ Model integrity dapat diverifikasi
-- ✓ Virtual camera (jika diimplementasi) terdeteksi di Meet/Zoom
-- ✓ Demo storytelling preset berfungsi
-- ✓ README cukup jelas untuk juri clone & run
-- ✓ ARCHITECTURE.md dengan diagram lengkap
-- ✓ INJECTION_POINTS.md menjelaskan extension strategy
-- ✓ FAQ siap dengan 15+ Q&A
+- âœ“ Berjalan stabil minimal 30 menit tanpa crash
+- âœ“ Live camera demo berjalan â‰¥ 15 FPS dengan latensi â‰¤ 400ms
+- âœ“ Upload single + batch berfungsi
+- âœ“ Dual pipeline (redacted + encrypted) terverifikasi
+- âœ“ Audit log lengkap dengan trace_id
+- âœ“ Privacy Score akurat real-time
+- âœ“ Hot reload config tanpa restart
+- âœ“ Dynamic Injection ter-handle (sesuai apa yang panitia kasih)
+- âœ“ Model integrity dapat diverifikasi
+- âœ“ Virtual camera (jika diimplementasi) terdeteksi di Meet/Zoom
+- âœ“ Demo storytelling preset berfungsi
+- âœ“ README cukup jelas untuk juri clone & run
+- âœ“ ARCHITECTURE.md dengan diagram lengkap
+- âœ“ INJECTION_POINTS.md menjelaskan extension strategy
+- âœ“ FAQ siap dengan 15+ Q&A
 
 ### 19.3 Definition of "Done" untuk Repository
 
-- ✓ Tag `v1.0` di GitHub
-- ✓ README dengan 3-step quick start
-- ✓ `make run` atau `docker compose up` works on fresh clone
-- ✓ Tidak ada secret di-commit (gunakan `.env.example`)
-- ✓ `.gitignore` lengkap (data/, models/, .env)
-- ✓ LICENSE file (MIT atau Apache 2.0)
-- ✓ CONTRIBUTING.md (optional but nice)
+- âœ“ Tag `v1.0` di GitHub
+- âœ“ README dengan 3-step quick start
+- âœ“ `make run` atau `docker compose up` works on fresh clone
+- âœ“ Tidak ada secret di-commit (gunakan `.env.example`)
+- âœ“ `.gitignore` lengkap (data/, models/, .env)
+- âœ“ LICENSE file (MIT atau Apache 2.0)
+- âœ“ CONTRIBUTING.md (optional but nice)
 
 ### 19.4 Definition of "Done" untuk Pitch Deck
 
-- ✓ 12-15 slides
-- ✓ Mengikuti struktur: Crisis → Save → Sovereignty → Adaptation → Roadmap
-- ✓ Setiap slide ≤ 30 detik bicara
-- ✓ Demo video embedded sebagai backup (kalau live gagal)
-- ✓ Slide compliance dengan constraint A1-A5
-- ✓ Slide tentang Dynamic Injection handling
-- ✓ Roadmap 12 bulan visual
-- ✓ Slide tim dan kontak
+- âœ“ 12-15 slides
+- âœ“ Mengikuti struktur: Crisis â†’ Save â†’ Sovereignty â†’ Adaptation â†’ Roadmap
+- âœ“ Setiap slide â‰¤ 30 detik bicara
+- âœ“ Demo video embedded sebagai backup (kalau live gagal)
+- âœ“ Slide compliance dengan constraint A1-A5
+- âœ“ Slide tentang Dynamic Injection handling
+- âœ“ Roadmap 12 bulan visual
+- âœ“ Slide tim dan kontak
 
 ---
 
@@ -2127,16 +2127,16 @@ Sesuai guidebook:
 
 | Istilah | Definisi |
 |---|---|
-| DEK | Data Encryption Key — kunci unik per file untuk enkripsi data |
-| KEK | Key Encryption Key — master key untuk wrap DEK |
-| HSM | Hardware Security Module — chip fisik untuk simpan KEK |
+| DEK | Data Encryption Key â€” kunci unik per file untuk enkripsi data |
+| KEK | Key Encryption Key â€” master key untuk wrap DEK |
+| HSM | Hardware Security Module â€” chip fisik untuk simpan KEK |
 | AES-256-GCM | Standar enkripsi dengan authenticated mode |
 | Sovereign Vault | Tempat penyimpanan data asli terenkripsi (lokal, terisolasi) |
-| Public DMZ | Demilitarized Zone — tempat menyimpan data yang sudah aman (redacted) |
+| Public DMZ | Demilitarized Zone â€” tempat menyimpan data yang sudah aman (redacted) |
 | Edge Computing | Komputasi di perangkat lokal, bukan cloud |
 | Dynamic Injection | Skenario hackathon: panitia inject requirement runtime |
 | Visual Firewall | Konsep PrivAI: filter cerdas antara kamera dan platform |
-| YOLO | You Only Look Once — arsitektur model object detection |
+| YOLO | You Only Look Once â€” arsitektur model object detection |
 | FPS | Frames Per Second |
 | Trace ID | UUID yang mengikat semua audit log dari 1 transaksi |
 | Hot Reload | Apply perubahan config tanpa restart server |
@@ -2187,8 +2187,9 @@ Sesuai guidebook:
 
 **Catatan Penutup**
 
-Dokumen ini adalah *living document*. Selama pre-hackathon, update sesuai feedback dari latihan demo. Saat 24 jam berlangsung, jangan update dokumen ini — fokus pada eksekusi. Update lagi setelah Tahap 3 selesai untuk dokumentasi pasca-lomba.
+Dokumen ini adalah *living document*. Selama pre-hackathon, update sesuai feedback dari latihan demo. Saat 24 jam berlangsung, jangan update dokumen ini â€” fokus pada eksekusi. Update lagi setelah Tahap 3 selesai untuk dokumentasi pasca-lomba.
 
 **"The best architecture is one that survives requirements you didn't anticipate."**
 
-— Filosofi Dynamic Injection PrivAI Guard
+â€” Filosofi Dynamic Injection PrivAI
+

@@ -24,7 +24,7 @@ export default function App() {
       <section className="hero-card">
         <div className="mark"><ShieldCheck size={32} /></div>
         <p className="eyebrow">Local-first visual firewall</p>
-        <h1>PrivAI Guard</h1>
+        <h1>PrivAI</h1>
         <p className="lead">
           Skeleton Docker environment untuk backend FastAPI dan frontend Vite. Pipeline deteksi, redaksi, vault, dan audit bisa ditambahkan di struktur ini.
         </p>
@@ -45,3 +45,4 @@ function StatusCard({ title, data, error }: { title: string; data: Health | null
     </article>
   );
 }
+

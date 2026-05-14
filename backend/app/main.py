@@ -7,7 +7,7 @@ from app.config import get_settings
 settings = get_settings()
 
 app = FastAPI(
-    title="PrivAI Guard API",
+    title="PrivAI API",
     version="0.1.0",
     description="Local-first visual privacy firewall API.",
 )
@@ -26,3 +26,4 @@ app.include_router(health_router, prefix="/api")
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": settings.app_name, "docs": "/docs", "health": "/api/health"}
+

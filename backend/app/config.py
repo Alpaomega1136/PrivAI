@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "PrivAI Guard"
+    app_name: str = "PrivAI"
     app_env: str = "development"
     model_path: Path = Path("/app/models/model_deteksi.pt")
     config_path: Path = Path("/app/config/runtime.yaml")
@@ -23,3 +23,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+

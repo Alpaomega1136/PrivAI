@@ -1,6 +1,6 @@
 ﻿# PrivAI
 
-PrivAI Guard adalah Visual Firewall lokal untuk mendeteksi dan meredaksi data privasi seperti KTP, SIM, Paspor, NIK, wajah, dan plat nomor tanpa mengirim data sensitif ke cloud.
+PrivAI adalah Visual Firewall lokal untuk mendeteksi dan meredaksi data privasi seperti KTP, SIM, Paspor, NIK, wajah, dan plat nomor tanpa mengirim data sensitif ke cloud.
 
 ## Quick Start Docker
 
@@ -24,3 +24,4 @@ doc/       dokumen proposal
 research/  artefak riset non-runtime
 scripts/   helper scripts
 ```
+
