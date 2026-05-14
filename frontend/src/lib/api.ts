@@ -98,6 +98,27 @@ export type RedactImageInput = {
   ttaAngles?: string;
 };
 
+export type LiveFrameInput = {
+  frameBlob: Blob;
+  confidenceThreshold?: number;
+  redactionMode?: string;
+  activeClasses?: string;
+  disabledClasses?: string;
+};
+
+export type TurboLiveInput = {
+  sessionId?: string;
+  cameraIndex?: number;
+  confidenceThreshold?: number;
+  redactionMode?: string;
+  activeClasses?: string;
+  disabledClasses?: string;
+  targetWidth?: number;
+  inferIntervalMs?: number;
+  jpegQuality?: number;
+  boxHoldMs?: number;
+};
+
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/$/, "");
 }
@@ -270,6 +291,56 @@ export function redactImage(input: RedactImageInput) {
   });
 }
 
+export function redactLiveFrame(input: LiveFrameInput) {
+  const formData = new FormData();
+  formData.append("file", input.frameBlob, "frame.jpg");
+
+  const params = new URLSearchParams();
+  params.set("confidence_threshold", String(input.confidenceThreshold ?? 0.25));
+  params.set("redaction_mode", input.redactionMode || "blur");
+  if (input.activeClasses?.trim()) params.set("active_classes", input.activeClasses.trim());
+  if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());
+
+  return requestJson<Record<string, unknown>>(withParams("/api/live/redact-frame", params), {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function startTurboLive(input: TurboLiveInput = {}) {
+  const params = new URLSearchParams();
+  params.set("session_id", input.sessionId || "default");
+  params.set("camera_index", String(input.cameraIndex ?? 0));
+  params.set("confidence_threshold", String(input.confidenceThreshold ?? 0.25));
+  params.set("redaction_mode", input.redactionMode || "blur");
+  params.set("active_classes", input.activeClasses || "Wajah");
+  params.set("target_width", String(input.targetWidth ?? 416));
+  params.set("infer_interval_ms", String(input.inferIntervalMs ?? 90));
+  params.set("jpeg_quality", String(input.jpegQuality ?? 75));
+  params.set("box_hold_ms", String(input.boxHoldMs ?? 700));
+  if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());
+
+  return requestJson<Record<string, unknown>>(withParams("/api/live/turbo/start", params), { method: "POST" });
+}
+
+export function stopTurboLive(sessionId = "default") {
+  const params = new URLSearchParams();
+  params.set("session_id", sessionId);
+  return requestJson<Record<string, unknown>>(withParams("/api/live/turbo/stop", params), { method: "POST" });
+}
+
+export function getTurboLiveStatus(sessionId = "default") {
+  const params = new URLSearchParams();
+  params.set("session_id", sessionId);
+  return requestJson<Record<string, unknown>>(withParams("/api/live/turbo/status", params));
+}
+
+export function buildTurboMjpegUrl(sessionId = "default") {
+  const params = new URLSearchParams();
+  params.set("session_id", sessionId);
+  return `${activeApiBaseUrl}${withParams("/api/live/turbo/mjpeg", params)}`;
+}
+
 export function getRuntimePolicy() {
   return requestJson<RuntimePolicyResponse>("/api/runtime-policy");
 }
@@ -363,5 +434,10 @@ export function getRequiredBackendEndpoints() {
     { method: "GET", path: "/api/government/access-requests/{request_id}", feature: "Access request status" },
     { method: "GET", path: "/api/government/access-requests/{request_id}/secure-original", feature: "One-time original download" },
     { method: "GET", path: "/api/audit-logs", feature: "Security event trace" },
+    { method: "POST", path: "/api/live/redact-frame", feature: "Ephemeral live webcam frame redaction" },
+    { method: "POST", path: "/api/live/turbo/start", feature: "Start backend camera live stream" },
+    { method: "POST", path: "/api/live/turbo/stop", feature: "Stop backend camera live stream" },
+    { method: "GET", path: "/api/live/turbo/status", feature: "Live stream status" },
+    { method: "GET", path: "/api/live/turbo/mjpeg", feature: "MJPEG redacted live output" },
   ];
 }

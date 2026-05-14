@@ -340,6 +340,40 @@ input:focus, select:focus {
 }
 .preview-card span { font-size: 13px; font-weight: 600; color: var(--muted); }
 .preview-card img { width: 100%; height: 280px; object-fit: contain; border-radius: 12px; background: var(--surface-strong); border: 1px solid var(--line); }
+.live-hero {
+  background:
+    radial-gradient(circle at 80% 20%, rgba(166, 111, 63, 0.24), transparent 35%),
+    linear-gradient(135deg, var(--primary), #11372d);
+}
+.live-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #10241d;
+}
+.live-frame video,
+.live-frame img {
+  width: 100%;
+  min-height: 300px;
+  max-height: 420px;
+  object-fit: contain;
+  background: #10241d;
+}
+.live-frame .empty-state {
+  position: absolute;
+  inset: 16px;
+  height: auto;
+  color: rgba(251, 247, 237, 0.78);
+  background: rgba(251, 247, 237, 0.06);
+  border-color: rgba(251, 247, 237, 0.14);
+}
+.live-settings {
+  margin-top: 18px;
+}
 .empty-state {
   display: flex; align-items: center; justify-content: center;
   height: 280px;

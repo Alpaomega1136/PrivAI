@@ -1,6 +1,7 @@
 import {
   Activity,
   Building2,
+  Camera,
   ChevronDown,
   ChevronRight,
   Cpu,
@@ -14,9 +15,10 @@ import {
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
+  Video,
   Copy
 } from "lucide-react";
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ApiError,
@@ -24,6 +26,7 @@ import {
   AuditLog,
   AuditLogFilters,
   buildBackendFileUrl,
+  buildTurboMjpegUrl,
   createGovernmentAccessRequest,
   downloadGovernmentOriginal,
   getAuditLogs,
@@ -34,18 +37,22 @@ import {
   getRedactionConfig,
   getRuntimePolicy,
   getStorageRecords,
+  getTurboLiveStatus,
   getVaultRecord,
   HealthResponse,
+  redactLiveFrame,
   redactImage,
   RedactionConfigResponse,
   resetRuntimePolicy,
   rotateVaultKey,
   safeRequest,
+  startTurboLive,
+  stopTurboLive,
   updateRuntimePolicy,
   approveGovernmentAccessRequest,
 } from "./lib/api";
 
-type ViewId = "overview" | "user-zone" | "operational-zone" | "vault" | "government" | "dynamic" | "audit";
+type ViewId = "overview" | "user-zone" | "operational-zone" | "vault" | "government" | "dynamic" | "live" | "audit";
 
 type DashboardState = {
   health: ApiResult<HealthResponse>;
@@ -65,6 +72,7 @@ const navItems: Array<{ id: ViewId; label: string; icon: ReactNode; description:
   { id: "vault", label: "Sovereign Vault", icon: <LockKeyhole size={20} />, description: "Penyimpanan asli" },
   { id: "government", label: "Akses Pemerintah", icon: <Landmark size={20} />, description: "Otorisasi khusus" },
   { id: "dynamic", label: "Dynamic Policy", icon: <SlidersHorizontal size={20} />, description: "Aturan runtime" },
+  { id: "live", label: "Live Stream", icon: <Video size={20} />, description: "Privasi kamera" },
   { id: "audit", label: "Audit Log", icon: <Activity size={20} />, description: "Jejak aktivitas" },
 ];
 
@@ -143,6 +151,7 @@ export default function App() {
         {activeView === "vault" && <VaultView records={records} keyInfo={dashboard.cryptoKeyInfo} />}
         {activeView === "government" && <GovernmentAccess latestRecordId={latestRecordId} />}
         {activeView === "dynamic" && <DynamicInjection redactionConfig={dashboard.redactionConfig.data ?? null} onRefresh={refreshDashboard} />}
+        {activeView === "live" && <LiveStream />}
         {activeView === "audit" && <AuditLogView initialLogs={dashboard.auditLogs} />}
       </main>
     </div>
@@ -253,9 +262,9 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
 
   const redactedUrl = buildBackendFileUrl(readNestedString(result?.data, ["operational_zone", "redacted_file", "url"]));
   const detectionCount = result?.ok ? (result.data?.detections as any[])?.length ?? 0 : 0;
-  const redactedCount = result?.ok ? (result.data?.operational_zone as any)?.redacted_count ?? 0 : 0;
-  const latency = result?.ok ? (result.data?.metadata as any)?.latency_ms ?? 0 : 0;
-  const recordId = result?.ok ? (result.data?.operational_zone as any)?.record_id ?? "" : "";
+  const redactedCount = result?.ok ? Number(result.data?.redacted_count ?? 0) : 0;
+  const latency = result?.ok ? Number(result.data?.latency_ms ?? 0) : 0;
+  const recordId = result?.ok ? String(result.data?.record_id ?? "") : "";
 
   return (
     <div className="view-stack">
@@ -415,8 +424,8 @@ function OperationalZone({ recordsResult }: { recordsResult: ApiResult<{ records
                     </td>
                     <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
                     <td>
-                      {Boolean(record.redacted_file_url) && (
-                        <button type="button" className="primary-button secondary-button" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => window.open(buildBackendFileUrl(String(record.redacted_file_url)), "_blank")}>Lihat</button>
+                      {Boolean(record.redacted_url) && (
+                        <button type="button" className="primary-button secondary-button" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => window.open(buildBackendFileUrl(String(record.redacted_url)), "_blank")}>Lihat</button>
                       )}
                     </td>
                   </tr>
@@ -743,6 +752,331 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
           <JsonBlock data={policy} />
         </Collapsible>
       </Panel>
+    </div>
+  );
+}
+
+function LiveStream() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const turboIntervalRef = useRef<number | null>(null);
+
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isContinuous, setIsContinuous] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
+  const [redactionMode, setRedactionMode] = useState("blur");
+  const [activeClasses, setActiveClasses] = useState("Wajah");
+  const [redactedImage, setRedactedImage] = useState("");
+  const [frameStats, setFrameStats] = useState<Record<string, unknown> | null>(null);
+  const [browserError, setBrowserError] = useState("");
+
+  const [sessionId] = useState("default");
+  const [cameraIndex, setCameraIndex] = useState(0);
+  const [targetWidth, setTargetWidth] = useState(416);
+  const [inferIntervalMs, setInferIntervalMs] = useState(90);
+  const [jpegQuality, setJpegQuality] = useState(75);
+  const [boxHoldMs, setBoxHoldMs] = useState(700);
+  const [turboStatus, setTurboStatus] = useState<Record<string, unknown> | null>(null);
+  const [streamUrl, setStreamUrl] = useState("");
+  const [mjpegError, setMjpegError] = useState(false);
+  const [turboMessage, setTurboMessage] = useState("");
+  const [turboError, setTurboError] = useState("");
+  const [isTurboBusy, setIsTurboBusy] = useState(false);
+
+  async function startBrowserCamera() {
+    setBrowserError("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const isHttp = window.location.protocol === "http:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+      setBrowserError(
+        isHttp
+          ? "Akses kamera diblokir karena halaman dibuka via HTTP (bukan HTTPS). Buka via https:// atau gunakan localhost."
+          : "Browser ini tidak mendukung akses kamera (getUserMedia tidak tersedia)."
+      );
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 960, height: 540 }, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setIsCameraOn(true);
+    } catch (error) {
+      if (error instanceof DOMException) {
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          setBrowserError("Izin kamera ditolak. Klik ikon kunci/kamera di address bar browser dan izinkan akses kamera.");
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+          setBrowserError("Tidak ada kamera yang terdeteksi. Pastikan kamera terhubung dan tidak digunakan oleh aplikasi lain.");
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          setBrowserError("Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi tersebut lalu coba lagi.");
+        } else {
+          setBrowserError(`Gagal membuka kamera: ${error.message}`);
+        }
+      } else {
+        setBrowserError(error instanceof Error ? error.message : "Gagal membuka kamera browser.");
+      }
+    }
+  }
+
+  function stopBrowserCamera() {
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    intervalRef.current = null;
+    setIsContinuous(false);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsCameraOn(false);
+  }
+
+  function captureFrameBlob() {
+    return new Promise<Blob>((resolve, reject) => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || !video.videoWidth || !video.videoHeight) {
+        reject(new Error("Kamera belum siap untuk capture frame."));
+        return;
+      }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Gagal capture frame."))), "image/jpeg", 0.82);
+    });
+  }
+
+  async function processOneFrame() {
+    if (!isCameraOn || isProcessing) return;
+    setIsProcessing(true);
+    setBrowserError("");
+    const response = await safeRequest(async () => {
+      const frameBlob = await captureFrameBlob();
+      return redactLiveFrame({
+        frameBlob,
+        confidenceThreshold,
+        redactionMode,
+        activeClasses,
+      });
+    });
+    setIsProcessing(false);
+    if (!response.ok) {
+      setBrowserError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memproses frame.");
+      return;
+    }
+    const mimeType = String(response.data?.mime_type ?? "image/jpeg");
+    const imageBase64 = String(response.data?.frame_image_base64 ?? "");
+    setRedactedImage(imageBase64 ? `data:${mimeType};base64,${imageBase64}` : "");
+    setFrameStats(response.data ?? null);
+  }
+
+  function startContinuous() {
+    if (!isCameraOn || intervalRef.current) return;
+    setIsContinuous(true);
+    intervalRef.current = window.setInterval(() => void processOneFrame(), 900);
+  }
+
+  function stopContinuous() {
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    intervalRef.current = null;
+    setIsContinuous(false);
+  }
+
+  async function refreshTurboStatus() {
+    const response = await safeRequest(() => getTurboLiveStatus(sessionId));
+    if (response.ok) {
+      setTurboStatus(response.data ?? null);
+      setTurboError("");
+    } else {
+      setTurboError(response.error?.message || "Gagal membaca status Turbo Live.");
+    }
+  }
+
+  async function startTurbo() {
+    setIsTurboBusy(true);
+    setTurboError("");
+    setTurboMessage("");
+    const response = await safeRequest(() => startTurboLive({
+      sessionId,
+      cameraIndex,
+      confidenceThreshold,
+      redactionMode,
+      activeClasses,
+      targetWidth,
+      inferIntervalMs,
+      jpegQuality,
+      boxHoldMs,
+    }));
+    setIsTurboBusy(false);
+    if (!response.ok) {
+      setTurboError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memulai Turbo Live.");
+      return;
+    }
+    setTurboStatus(response.data ?? null);
+    setMjpegError(false);
+    setStreamUrl(buildTurboMjpegUrl(sessionId));
+    setTurboMessage("Turbo Live berjalan dari kamera lokal backend.");
+  }
+
+  async function stopTurbo() {
+    setIsTurboBusy(true);
+    const response = await safeRequest(() => stopTurboLive(sessionId));
+    setIsTurboBusy(false);
+    if (response.ok) {
+      setTurboStatus(response.data ?? null);
+      setStreamUrl("");
+      setMjpegError(false);
+      setTurboMessage("Turbo Live dihentikan.");
+      setTurboError("");
+    } else {
+      setTurboError(response.error?.message || "Gagal menghentikan Turbo Live.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshTurboStatus();
+    turboIntervalRef.current = window.setInterval(() => void refreshTurboStatus(), 2000);
+    return () => {
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      if (turboIntervalRef.current) window.clearInterval(turboIntervalRef.current);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const running = turboStatus?.running === true;
+  const latestStats = (turboStatus?.latest_stats ?? {}) as Record<string, unknown>;
+
+  return (
+    <div className="view-stack">
+      <section className="hero-panel live-hero">
+        <h2>Live Stream Privacy Filter</h2>
+        <p className="lead">Mode sekunder untuk menyamarkan wajah pada kamera real-time. Frame diproses sementara dan tidak disimpan di Operational Zone maupun Sovereign Vault.</p>
+      </section>
+
+      <div className="two-column">
+        <Panel title="Browser Webcam" eyebrow="Ephemeral Frame Upload" icon={<Camera />}>
+          <div className="live-frame">
+            <video ref={videoRef} autoPlay playsInline muted />
+            <canvas ref={canvasRef} hidden />
+            {!isCameraOn && <div className="empty-state">Kamera browser belum aktif.</div>}
+          </div>
+          <div className="button-row">
+            {!isCameraOn ? (
+              <button type="button" onClick={startBrowserCamera}>Start Camera</button>
+            ) : (
+              <button type="button" className="secondary-button" onClick={stopBrowserCamera}>Stop Camera</button>
+            )}
+            <button type="button" onClick={() => void processOneFrame()} disabled={!isCameraOn || isProcessing}>
+              {isProcessing ? <><RefreshCw className="spin" size={16} /> Processing</> : "Process Frame"}
+            </button>
+            <button type="button" className="secondary-button" onClick={isContinuous ? stopContinuous : startContinuous} disabled={!isCameraOn}>
+              {isContinuous ? "Stop Continuous" : "Start Continuous"}
+            </button>
+          </div>
+
+          <div className="form-grid live-settings">
+            <Field label={`Confidence (${confidenceThreshold})`}>
+              <input type="range" min="0.01" max="0.99" step="0.01" value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(Number(event.target.value))} />
+            </Field>
+            <Field label="Mode">
+              <select value={redactionMode} onChange={(event) => setRedactionMode(event.target.value)}>
+                <option value="blur">blur</option>
+                <option value="pixelate">pixelate</option>
+                <option value="black_box">black_box</option>
+              </select>
+            </Field>
+            <Field label="Active Classes">
+              <input value={activeClasses} onChange={(event) => setActiveClasses(event.target.value)} />
+            </Field>
+          </div>
+          {browserError && <div className="result-box error-box">{browserError}</div>}
+          {frameStats && (
+            <div className="meta-row">
+              <div className="meta-item"><span>Latency</span><strong>{String(frameStats.latency_ms ?? 0)} ms</strong></div>
+              <div className="meta-item"><span>Deteksi</span><strong>{String(frameStats.detection_count ?? 0)}</strong></div>
+              <div className="meta-item"><span>Diredaksi</span><strong>{String(frameStats.redacted_count ?? 0)}</strong></div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Redacted Browser Output" eyebrow="No Persistence" icon={<EyeOff />}>
+          <div className="live-frame">
+            {redactedImage ? <img src={redactedImage} alt="Redacted webcam frame" /> : <div className="empty-state">Output frame akan tampil setelah diproses.</div>}
+          </div>
+          <div className="alert-card success">
+            <ShieldCheck size={24} color="var(--success)" />
+            <div>
+              <strong>Ephemeral Processing</strong>
+              <p>Frame live tidak disimpan ke storage dan tidak masuk vault. Ini berbeda dari flow dokumen pemerintah.</p>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="two-column">
+        <Panel title="Turbo Live Backend Camera" eyebrow="MJPEG Stream" icon={<Video />}>
+          <div className="form-grid">
+            <Field label="Camera Index"><input type="number" min="0" value={cameraIndex} onChange={(event) => setCameraIndex(Number(event.target.value))} /></Field>
+            <Field label="Target Width"><input type="number" min="240" max="1280" value={targetWidth} onChange={(event) => setTargetWidth(Number(event.target.value))} /></Field>
+            <Field label="Infer Interval (ms)"><input type="number" min="50" max="2000" value={inferIntervalMs} onChange={(event) => setInferIntervalMs(Number(event.target.value))} /></Field>
+            <Field label="JPEG Quality"><input type="number" min="35" max="95" value={jpegQuality} onChange={(event) => setJpegQuality(Number(event.target.value))} /></Field>
+            <Field label="Box Hold (ms)"><input type="number" min="100" max="5000" value={boxHoldMs} onChange={(event) => setBoxHoldMs(Number(event.target.value))} /></Field>
+          </div>
+          <div className="button-row">
+            <button type="button" onClick={startTurbo} disabled={isTurboBusy}>{isTurboBusy ? "Working..." : "Start Turbo"}</button>
+            <button type="button" className="secondary-button" onClick={stopTurbo} disabled={isTurboBusy}>Stop</button>
+            <button type="button" className="secondary-button" onClick={() => void refreshTurboStatus()}>Refresh Status</button>
+          </div>
+          {turboMessage && <div className="result-box success-box">{turboMessage}</div>}
+          {turboError && <div className="result-box error-box">{turboError}</div>}
+        </Panel>
+
+        <Panel title="Turbo Output" eyebrow={running ? "Running" : "Stopped"} icon={<Video />}>
+          <div className="live-frame">
+            {streamUrl && !mjpegError ? (
+              <img
+                src={streamUrl}
+                alt="Turbo live MJPEG stream"
+                onError={() => {
+                  setMjpegError(true);
+                  setTurboError("MJPEG stream terputus atau tidak dapat dibuka. Pastikan sesi masih berjalan lalu klik Reconnect.");
+                }}
+              />
+            ) : mjpegError ? (
+              <div className="empty-state">
+                <p style={{ color: "var(--danger)", marginBottom: "12px" }}>Stream terputus.</p>
+                <button
+                  type="button"
+                  className="primary-button secondary-button"
+                  onClick={() => { setMjpegError(false); setTurboError(""); setStreamUrl(buildTurboMjpegUrl(sessionId)); }}
+                >
+                  Reconnect Stream
+                </button>
+              </div>
+            ) : running ? (
+              <div className="empty-state">
+                <p style={{ marginBottom: "12px" }}>Sesi aktif di backend.</p>
+                <button
+                  type="button"
+                  className="primary-button secondary-button"
+                  onClick={() => { setMjpegError(false); setTurboError(""); setStreamUrl(buildTurboMjpegUrl(sessionId)); }}
+                >
+                  Sambungkan Stream
+                </button>
+              </div>
+            ) : (
+              <div className="empty-state">Klik Start Turbo untuk membuka stream MJPEG dari backend.</div>
+            )}
+          </div>
+          <div className="meta-row">
+            <div className="meta-item"><span>Frames</span><strong>{String(turboStatus?.frame_counter ?? 0)}</strong></div>
+            <div className="meta-item"><span>Inference</span><strong>{String(turboStatus?.inference_counter ?? 0)}</strong></div>
+            <div className="meta-item"><span>Latency</span><strong>{String(latestStats.latency_ms ?? 0)} ms</strong></div>
+            <div className="meta-item"><span>Redacted</span><strong>{String(latestStats.redacted_count ?? 0)}</strong></div>
+          </div>
+          <Collapsible title="Detail Turbo Status">
+            <JsonBlock data={turboStatus} />
+          </Collapsible>
+        </Panel>
+      </div>
     </div>
   );
 }
