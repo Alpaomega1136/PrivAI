@@ -1,48 +1,117 @@
-﻿import { ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { getHealth, getModelHealth } from "./lib/api";
+import { GovernmentShell } from "./layouts/GovernmentShell";
+import { UserShell } from "./layouts/UserShell";
+import { AppMode, GovernmentViewId, UserViewId } from "./lib/navigation";
+import { useDashboard } from "./lib/useDashboard";
 
-type Health = Record<string, unknown>;
+import { UserHomeView } from "./views/user/UserHomeView";
+import { UserDocumentUploadView } from "./views/user/UserDocumentUploadView";
+import { UserLiveFilterView } from "./views/user/UserLiveFilterView";
+import { UserPrivacyView } from "./views/user/UserPrivacyView";
+import { UserHowItWorksView } from "./views/user/UserHowItWorksView";
+
+import { GovernmentOverviewView } from "./views/government/GovernmentOverviewView";
+import { OperationalZoneView } from "./views/government/OperationalZoneView";
+import { SovereignVaultView } from "./views/government/SovereignVaultView";
+import { GovernmentAccessView } from "./views/government/GovernmentAccessView";
+import { DynamicInjectionView } from "./views/government/DynamicInjectionView";
+import { AuditLogView } from "./views/government/AuditLogView";
+import { MetricsView } from "./views/government/MetricsView";
+
+import "./multi-select.css";
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [model, setModel] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [appMode, setAppMode] = useState<AppMode>("user");
+  const [activeUserView, setActiveUserView] = useState<UserViewId>("home");
+  const [activeGovernmentView, setActiveGovernmentView] = useState<GovernmentViewId>("overview");
 
-  useEffect(() => {
-    Promise.all([getHealth(), getModelHealth()])
-      .then(([healthData, modelData]) => {
-        setHealth(healthData);
-        setModel(modelData);
-      })
-      .catch((err: Error) => setError(err.message));
-  }, []);
+  const { dashboard, isLoading, refreshDashboard } = useDashboard();
 
-  return (
-    <main className="shell">
-      <section className="hero-card">
-        <div className="mark"><ShieldCheck size={32} /></div>
-        <p className="eyebrow">Local-first visual firewall</p>
-        <h1>PrivAI</h1>
-        <p className="lead">
-          Skeleton Docker environment untuk backend FastAPI dan frontend Vite. Pipeline deteksi, redaksi, vault, dan audit bisa ditambahkan di struktur ini.
-        </p>
-        <div className="grid">
-          <StatusCard title="Backend" data={health} error={error} />
-          <StatusCard title="Model" data={model} error={error} />
+  const records = dashboard.storageRecords.data?.records ?? [];
+  const latestRecordId = String(records[0]?.record_id ?? "");
+
+  if (appMode === "user") {
+    // The live filter view stays mounted (display-toggled) so an active
+    // backend camera session is not torn down while navigating within user mode.
+    const renderActiveUserView = () => {
+      switch (activeUserView) {
+        case "home":
+          return <UserHomeView onNavigate={setActiveUserView} />;
+        case "document-upload":
+          return (
+            <UserDocumentUploadView
+              redactionConfig={dashboard.redactionConfig.data ?? null}
+              onRefresh={refreshDashboard}
+            />
+          );
+        case "privacy":
+          return <UserPrivacyView />;
+        case "how-it-works":
+          return <UserHowItWorksView onNavigate={setActiveUserView} />;
+        case "live-filter":
+          return null;
+        default:
+          return <UserHomeView onNavigate={setActiveUserView} />;
+      }
+    };
+
+    return (
+      <UserShell
+        appMode={appMode}
+        onModeChange={setAppMode}
+        activeView={activeUserView}
+        onNavigate={setActiveUserView}
+      >
+        {activeUserView !== "live-filter" && renderActiveUserView()}
+        <div style={{ display: activeUserView === "live-filter" ? "" : "none" }}>
+          <UserLiveFilterView isActive={activeUserView === "live-filter"} />
         </div>
-      </section>
-    </main>
-  );
-}
+      </UserShell>
+    );
+  }
 
-function StatusCard({ title, data, error }: { title: string; data: Health | null; error: string | null }) {
+  const renderGovernmentView = () => {
+    switch (activeGovernmentView) {
+      case "overview":
+        return (
+          <GovernmentOverviewView dashboard={dashboard} records={records} onNavigate={setActiveGovernmentView} />
+        );
+      case "operational-zone":
+        return <OperationalZoneView recordsResult={dashboard.storageRecords} />;
+      case "sovereign-vault":
+        return <SovereignVaultView records={records} keyInfo={dashboard.cryptoKeyInfo} />;
+      case "government-access":
+        return <GovernmentAccessView latestRecordId={latestRecordId} />;
+      case "dynamic-injection":
+        return (
+          <DynamicInjectionView
+            redactionConfig={dashboard.redactionConfig.data ?? null}
+            onRefresh={refreshDashboard}
+          />
+        );
+      case "audit-log":
+        return <AuditLogView initialLogs={dashboard.auditLogs} />;
+      case "metrics":
+        return <MetricsView dashboard={dashboard} />;
+      default:
+        return (
+          <GovernmentOverviewView dashboard={dashboard} records={records} onNavigate={setActiveGovernmentView} />
+        );
+    }
+  };
+
   return (
-    <article className="status-card">
-      <h2>{title}</h2>
-      {error ? <p className="error">{error}</p> : <pre>{JSON.stringify(data ?? { status: "loading" }, null, 2)}</pre>}
-    </article>
+    <GovernmentShell
+      appMode={appMode}
+      onModeChange={setAppMode}
+      activeView={activeGovernmentView}
+      onNavigate={setActiveGovernmentView}
+      online={dashboard.health.ok}
+      isLoading={isLoading}
+      onRefresh={refreshDashboard}
+    >
+      {renderGovernmentView()}
+    </GovernmentShell>
   );
 }
-

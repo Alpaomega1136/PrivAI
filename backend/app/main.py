@@ -1,15 +1,19 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.health import router as health_router
-from app.config import get_settings
+from app.api import audit, crypto, government, live, redaction, runtime, storage, system
+from app.core.config import get_settings
+from app.db.database import init_db, session_scope
+from app.services.authenticity_service import load_in_background as load_ocr_in_background
+from app.services.vault_service import ensure_active_vault_key
+from app.ai.runtime import detector
 
 settings = get_settings()
 
 app = FastAPI(
-    title="PrivAI API",
-    version="0.1.0",
-    description="Local-first visual privacy firewall API.",
+    title=settings.app_name,
+    version="1.0.0",
+    description="Government-first local visual privacy firewall API.",
 )
 
 app.add_middleware(
@@ -20,10 +24,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router, prefix="/api")
+
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+    with session_scope() as db:
+        ensure_active_vault_key(db)
+    detector.load_in_background()
+    load_ocr_in_background()
 
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"service": settings.app_name, "docs": "/docs", "health": "/api/health"}
+    return {"app": settings.app_name, "docs": "/docs", "health": "/api/health"}
+
+
+app.include_router(system.router, prefix="/api")
+app.include_router(redaction.router, prefix="/api")
+app.include_router(live.router, prefix="/api")
+app.include_router(storage.router, prefix="/api")
+app.include_router(crypto.router, prefix="/api")
+app.include_router(runtime.router, prefix="/api")
+app.include_router(government.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
 
