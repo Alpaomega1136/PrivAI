@@ -155,6 +155,16 @@ export function UserDocumentUploadView({
     <div className="view-stack user-upload-page">
       {PAGE_ASSETS.banner && <img className="page-banner" src={PAGE_ASSETS.banner} alt="" />}
 
+      <section className="user-hero user-hero-compact upload-hero">
+        <div className="user-hero-copy">
+          <h1>Document Privacy Shield.</h1>
+          <p>
+            Upload dokumen identitas, biarkan PrivAI mendeteksi area sensitif secara lokal, lalu bagikan hanya output
+            yang sudah aman.
+          </p>
+        </div>
+      </section>
+
       <form className="user-upload-form" onSubmit={submit}>
         <div className="upload-workbench">
           <section className="upload-viewer-card upload-source-card">
@@ -211,7 +221,7 @@ export function UserDocumentUploadView({
                       options={availableClasses}
                       selected={activeClasses}
                       onChange={setActiveClasses}
-                      helper={<span style={{ color: "transparent" }}>Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes.</span>}
+                      helper="Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes."
                     />
                   </Field>
 
