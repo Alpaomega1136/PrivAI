@@ -1,15 +1,14 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.health import router as health_router
-from app.config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 
 app = FastAPI(
-    title="PrivAI API",
+    title=settings.app_name,
     version="0.1.0",
-    description="Local-first visual privacy firewall API.",
+    description="Government-first local visual privacy firewall API.",
 )
 
 app.add_middleware(
@@ -20,10 +19,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(health_router, prefix="/api")
-
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"service": settings.app_name, "docs": "/docs", "health": "/api/health"}
+    return {
+        "app": settings.app_name,
+        "docs": "/docs",
+        "health": "/api/health",
+    }
 
+
+@app.get("/api/health")
+def health() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "model_loaded": False,
+        "model_exists": settings.model_exists,
+        "device": settings.model_device,
+        "operational_zone": "ready" if settings.operational_redacted_dir.exists() else "missing",
+        "sovereign_vault": "ready" if settings.vault_encrypted_original_dir.exists() else "missing",
+    }

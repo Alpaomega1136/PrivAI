@@ -14,7 +14,7 @@ dist/
 .next/
 
 # Runtime data
-privai-test/
+privai/
 backend/data/*
 !backend/data/.gitkeep
 !backend/data/public-redacted/
