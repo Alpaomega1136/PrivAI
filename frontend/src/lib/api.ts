@@ -3,10 +3,8 @@ const defaultApiBaseUrl = configuredApiBaseUrl || "";
 const fallbackApiBaseUrls = [
   defaultApiBaseUrl,
   "",
-  "http://127.0.0.1:8010",
-  "http://localhost:8010",
-  "http://127.0.0.1:8000",
-  "http://localhost:8000",
+  "https://127.0.0.1:8000",
+  "https://localhost:8000",
 ];
 
 let activeApiBaseUrl = defaultApiBaseUrl;
@@ -96,6 +94,8 @@ export type RedactImageInput = {
   useRuntimePolicy?: boolean;
   documentTta?: boolean;
   ttaAngles?: string;
+  guardrailEnabled?: boolean;
+  guardrailMode?: string;
 };
 
 export type LiveFrameInput = {
@@ -236,7 +236,7 @@ export function getApiBaseCandidates() {
 
 export function buildBackendFileUrl(relativeUrl?: string) {
   if (!relativeUrl) return "";
-  if (relativeUrl.startsWith("http://") || relativeUrl.startsWith("https://")) return relativeUrl;
+  if (/^https?:\/\//i.test(relativeUrl)) return relativeUrl.replace(/^http:/i, "https:");
   return `${activeApiBaseUrl}${relativeUrl}`;
 }
 
@@ -280,6 +280,8 @@ export function redactImage(input: RedactImageInput) {
   params.set("profile", input.profile);
   params.set("document_tta", String(input.documentTta ?? true));
   params.set("tta_angles", input.ttaAngles || "0,180");
+  params.set("guardrail_enabled", String(input.guardrailEnabled ?? true));
+  params.set("guardrail_mode", input.guardrailMode || "precision_demo");
   if (input.redactionMode && input.redactionMode !== "default") params.set("redaction_mode", input.redactionMode);
   if (input.activeClasses?.trim()) params.set("active_classes", input.activeClasses.trim());
   if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());

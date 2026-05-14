@@ -17,7 +17,7 @@ import {
   Video,
   Copy
 } from "lucide-react";
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from "react";
 
 import {
   ApiError,
@@ -50,6 +50,8 @@ import {
   approveGovernmentAccessRequest,
 } from "./lib/api";
 
+import "./multi-select.css";
+
 type ViewId = "overview" | "user-zone" | "operational-zone" | "vault" | "government" | "dynamic" | "live" | "audit";
 
 type DashboardState = {
@@ -62,6 +64,30 @@ type DashboardState = {
 };
 
 const emptyResult = <T,>(): ApiResult<T> => ({ ok: false, error: { status: 0, message: "Not loaded" } });
+
+const PRIVACY_CLASSES = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
+
+function normalizePrivacyClasses(value: unknown, fallback: string[] = PRIVACY_CLASSES): string[] {
+  const rawItems = Array.isArray(value)
+    ? value.map(String)
+    : typeof value === "string"
+      ? value.split(",").map((item) => item.trim()).filter(Boolean)
+      : fallback;
+  return PRIVACY_CLASSES.filter((className) => rawItems.includes(className));
+}
+
+function getDisabledPrivacyClasses(activeClasses: string[]): string[] {
+  return PRIVACY_CLASSES.filter((className) => !activeClasses.includes(className));
+}
+
+function withDerivedPolicyClasses(policy: Record<string, unknown>): Record<string, unknown> {
+  const activeClasses = normalizePrivacyClasses(policy.active_classes);
+  return {
+    ...policy,
+    active_classes: activeClasses,
+    disabled_classes: getDisabledPrivacyClasses(activeClasses),
+  };
+}
 
 const navItems: Array<{ id: ViewId; label: string; icon: ReactNode; description: string }> = [
   { id: "overview", label: "Beranda", icon: <Gauge size={20} />, description: "Overview sistem" },
@@ -214,9 +240,9 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
   const [profile, setProfile] = useState("government");
   const [redactionMode, setRedactionMode] = useState("default");
   
-  const availableClasses = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
+  const availableClasses = PRIVACY_CLASSES;
   const [activeClasses, setActiveClasses] = useState<string[]>(availableClasses);
-  const [disabledClasses, setDisabledClasses] = useState<string[]>([]);
+  const disabledClasses = getDisabledPrivacyClasses(activeClasses);
   
   const [useRuntimePolicy, setUseRuntimePolicy] = useState(false);
   const [documentTta, setDocumentTta] = useState(true);
@@ -228,16 +254,6 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
     setFile(nextFile);
     setPreview(nextFile ? URL.createObjectURL(nextFile) : "");
     setResult(null);
-  }
-
-  function toggleClass(className: string) {
-    if (activeClasses.includes(className)) {
-      setActiveClasses(activeClasses.filter(c => c !== className));
-      setDisabledClasses([...disabledClasses, className]);
-    } else {
-      setActiveClasses([...activeClasses, className]);
-      setDisabledClasses(disabledClasses.filter(c => c !== className));
-    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -262,9 +278,12 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
 
   const redactedUrl = buildBackendFileUrl(readNestedString(result?.data, ["operational_zone", "redacted_file", "url"]));
   const detectionCount = result?.ok ? (result.data?.detections as any[])?.length ?? 0 : 0;
-  const redactedCount = result?.ok ? Number(result.data?.redacted_count ?? 0) : 0;
-  const latency = result?.ok ? Number(result.data?.latency_ms ?? 0) : 0;
-  const recordId = result?.ok ? String(result.data?.record_id ?? "") : "";
+  const redactedCount = result?.ok ? (result.data?.operational_zone as any)?.redacted_count ?? 0 : 0;
+  const latency = result?.ok ? (result.data?.metadata as any)?.latency_ms ?? 0 : 0;
+  const recordId = result?.ok ? (result.data?.operational_zone as any)?.record_id ?? "" : "";
+  const rejectedDetections = result?.ok ? ((result.data?.rejected_detections as any[]) ?? []) : [];
+  const validationSummary = result?.ok ? ((result.data?.validation_summary as Record<string, unknown> | undefined) ?? null) : null;
+  const rejectedCount = Number(validationSummary?.rejected_count ?? rejectedDetections.length);
 
   return (
     <div className="view-stack">
@@ -296,13 +315,12 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
             </div>
 
             <Field label="Target Kelas Aktif">
-              <div className="chip-group">
-                {availableClasses.map(cls => (
-                  <div key={cls} className={`chip ${activeClasses.includes(cls) ? 'active' : ''}`} onClick={() => toggleClass(cls)}>
-                    {cls}
-                  </div>
-                ))}
-              </div>
+              <ClassSelectionGrid
+                options={availableClasses}
+                selected={activeClasses}
+                onChange={setActiveClasses}
+                helper="Kelas yang aktif akan diredaksi. Kelas yang tidak dipilih otomatis dikirim sebagai disabled_classes."
+              />
             </Field>
 
             <div className="inline-form">
@@ -350,14 +368,28 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
                   <span>Diredaksi</span>
                   <strong>{redactedCount} area</strong>
                 </div>
+                <div className="meta-item">
+                  <span>Ditolak Guardrail</span>
+                  <strong>{rejectedCount} objek</strong>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
                 {(result.data?.detections as any[])?.map((d: any, i: number) => (
-                  <div key={i} className="badge copper">{d.class_name} {(d.confidence * 100).toFixed(0)}%</div>
+                  <div key={i} className={`badge ${String(d.guardrail_action) === "skip_redaction" ? "danger" : "copper"}`}>
+                    {d.class_name} {(d.confidence * 100).toFixed(0)}%
+                    {d.validation_status ? ` - ${d.validation_status}` : ""}
+                  </div>
                 ))}
               </div>
-              <KtpAuthenticityPanel items={(result.data?.ktp_authenticity as KtpAuthenticityItem[]) ?? []} />
-              <button type="button" className="primary-button secondary-button" style={{ marginTop: '12px' }} onClick={() => window.open(redactedUrl, "_blank")}>Buka Gambar Redaksi</button>
+              {rejectedCount > 0 && (
+                <div className="alert-card warning" style={{ marginBottom: 0 }}>
+                  <ShieldCheck size={24} color="var(--warning)" />
+                  <div>
+                    <strong>Guardrail menolak {rejectedCount} kandidat</strong>
+                    <p>Deteksi yang dicurigai sebagai gambar tangan/sketsa atau tidak punya bukti dokumen resmi tidak ikut diredaksi pada mode precision demo.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -384,8 +416,25 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
 
 function OperationalZone({ recordsResult }: { recordsResult: ApiResult<{ records: Array<Record<string, unknown>> } & Record<string, unknown>> }) {
   const records = recordsResult.data?.records ?? [];
+  const [viewerUrl, setViewerUrl] = useState("");
+
+  function getRedactedUrl(record: Record<string, unknown>) {
+    return buildBackendFileUrl(
+      String(record.redacted_url ?? record.redacted_file_url ?? "")
+    );
+  }
+
   return (
     <div className="view-stack">
+      {viewerUrl && (
+        <SecureViewer 
+          url={viewerUrl} 
+          title="Pratinjau Dokumen Tersensor" 
+          onClose={() => setViewerUrl("")} 
+          isSensitive={false} 
+        />
+      )}
+      
       <Panel title="Daftar Dokumen Redacted" eyebrow="Operational Data" icon={<Database />}>
         <div className="alert-card success">
           <ShieldCheck size={24} color="var(--success)" />
@@ -411,26 +460,38 @@ function OperationalZone({ recordsResult }: { recordsResult: ApiResult<{ records
                 </tr>
               </thead>
               <tbody>
-                {records.map((record) => (
-                  <tr key={String(record.record_id)}>
-                    <td><strong>{String(record.record_id).substring(0,8)}...</strong></td>
-                    <td>{String(record.original_filename ?? "-")}</td>
-                    <td>
-                      <div className="badge muted">{String(record.redaction_profile ?? "-")}</div>
-                      <div className="badge muted" style={{marginLeft: '4px'}}>{String(record.redaction_mode ?? "-")}</div>
-                    </td>
-                    <td>
-                      <small>{Number(record.detection_count ?? 0)} deteksi</small>
-                      <small>{Number(record.redacted_count ?? 0)} diredaksi</small>
-                    </td>
-                    <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
-                    <td>
-                      {Boolean(record.redacted_url) && (
-                        <button type="button" className="primary-button secondary-button" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => window.open(buildBackendFileUrl(String(record.redacted_url)), "_blank")}>Lihat</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {records.map((record) => {
+                  const redactedUrl = getRedactedUrl(record);
+                  return (
+                    <tr key={String(record.record_id)}>
+                      <td><strong>{String(record.record_id).substring(0,8)}...</strong></td>
+                      <td>
+                        {String(record.original_filename ?? "-")}
+                        {Boolean(record.redacted_filename) && <small>Redacted: {String(record.redacted_filename)}</small>}
+                      </td>
+                      <td>
+                        <div className="badge muted">{String(record.redaction_profile ?? "-")}</div>
+                        <div className="badge muted" style={{marginLeft: '4px'}}>{String(record.redaction_mode ?? "-")}</div>
+                      </td>
+                      <td>
+                        <small>{Number(record.detection_count ?? 0)} deteksi</small>
+                        <small>{Number(record.redacted_count ?? 0)} diredaksi</small>
+                      </td>
+                      <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
+                      <td>
+                        {redactedUrl ? (
+                          <div className="table-actions">
+                            <button type="button" className="primary-button secondary-button compact-button" onClick={() => setViewerUrl(redactedUrl)}>
+                              Preview
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="badge muted">Tidak tersedia</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -445,8 +506,23 @@ function VaultView({ records, keyInfo }: { records: Array<Record<string, unknown
   const [cryptoAdminToken, setCryptoAdminToken] = useState("privai-crypto-admin-demo-token");
   const [vaultResult, setVaultResult] = useState<ApiResult<Record<string, unknown>> | null>(null);
   const [rotateResult, setRotateResult] = useState<ApiResult<Record<string, unknown>> | null>(null);
+  const [search, setSearch] = useState("");
 
   const kInfo = keyInfo.data as any;
+
+  const filteredRecords = records.filter(r => {
+    const rId = String(r.record_id ?? "").toLowerCase();
+    const fName = String(r.original_filename ?? "").toLowerCase();
+    const s = search.toLowerCase();
+    return rId.includes(s) || fName.includes(s);
+  });
+
+  async function handleRowClick(id: string) {
+    setRecordId(id);
+    const result = await safeRequest(() => getVaultRecord(id));
+    setVaultResult(result);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   return (
     <div className="view-stack">
@@ -485,10 +561,22 @@ function VaultView({ records, keyInfo }: { records: Array<Record<string, unknown
         </Panel>
 
         <div style={{ display: 'grid', gap: '24px', alignContent: 'start' }}>
-          <Panel title="Pencarian Metadata Vault" eyebrow="Lookup" icon={<Database />}>
+          <Panel title="Rotasi Kunci (Admin Crypto)" eyebrow="Maintenance" icon={<KeyRound />}>
+            <div className="inline-form" style={{marginTop: 0}}>
+              <input value={cryptoAdminToken} onChange={(e) => setCryptoAdminToken(e.target.value)} type="password" placeholder="Admin Token" />
+              <button type="button" className="primary-button secondary-button" onClick={async () => setRotateResult(await safeRequest(() => rotateVaultKey(cryptoAdminToken)))}>Rotasi Kunci</button>
+            </div>
+            {rotateResult && (
+              <div className={`result-box ${rotateResult.ok ? 'success-box' : 'error-box'}`}>
+                {rotateResult.ok ? "Rotasi kunci berhasil diinisiasi." : "Gagal merotasi kunci."}
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Detail Metadata Vault" eyebrow="Lookup" icon={<Database />}>
             <div className="inline-form" style={{marginTop: 0}}>
               <input value={recordId} onChange={(e) => setRecordId(e.target.value)} placeholder="Masukkan Record ID" />
-              <button type="button" className="primary-button" onClick={async () => setVaultResult(await safeRequest(() => getVaultRecord(recordId)))}>Cari</button>
+              <button type="button" className="primary-button" onClick={async () => setVaultResult(await safeRequest(() => getVaultRecord(recordId)))}>Cari Manual</button>
             </div>
             {vaultResult && (
               <div className="result-box">
@@ -504,20 +592,51 @@ function VaultView({ records, keyInfo }: { records: Array<Record<string, unknown
               </div>
             )}
           </Panel>
-
-          <Panel title="Rotasi Kunci (Admin Crypto)" eyebrow="Maintenance" icon={<KeyRound />}>
-            <div className="inline-form" style={{marginTop: 0}}>
-              <input value={cryptoAdminToken} onChange={(e) => setCryptoAdminToken(e.target.value)} type="password" placeholder="Admin Token" />
-              <button type="button" className="primary-button secondary-button" onClick={async () => setRotateResult(await safeRequest(() => rotateVaultKey(cryptoAdminToken)))}>Rotasi Kunci</button>
-            </div>
-            {rotateResult && (
-              <div className={`result-box ${rotateResult.ok ? 'success-box' : 'error-box'}`}>
-                {rotateResult.ok ? "Rotasi kunci berhasil diinisiasi." : "Gagal merotasi kunci."}
-              </div>
-            )}
-          </Panel>
         </div>
       </div>
+
+      <Panel title="Daftar Dokumen di Vault" eyebrow="Vault Records" icon={<Database />}>
+        <div style={{ marginBottom: '16px' }}>
+          <input 
+            type="text" 
+            placeholder="Cari berdasarkan Record ID atau Filename..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            style={{ maxWidth: '400px' }}
+          />
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Record ID</th>
+                <th>Original Filename</th>
+                <th>Terenkripsi</th>
+                <th>Dibuat Pada</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRecords.map((record) => (
+                <tr key={String(record.record_id)}>
+                  <td><strong>{String(record.record_id).substring(0,8)}...</strong></td>
+                  <td>{String(record.original_filename ?? "-")}</td>
+                  <td>{record.vault_encrypted ? <span className="badge green">Ya</span> : <span className="badge danger">Tidak</span>}</td>
+                  <td><small>{new Date(String(record.created_at)).toLocaleString('id-ID')}</small></td>
+                  <td>
+                    <button type="button" className="primary-button secondary-button" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => handleRowClick(String(record.record_id))}>Lihat Detail</button>
+                  </td>
+                </tr>
+              ))}
+              {filteredRecords.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{textAlign: 'center', padding: '24px', color: 'var(--muted)'}}>Tidak ada record yang sesuai dengan pencarian.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -528,23 +647,27 @@ function GovernmentAccess({ latestRecordId }: { latestRecordId: string }) {
   const [requestId, setRequestId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   
-  const [requester, setRequester] = useState("Dukcapil Officer");
-  const [reason, setReason] = useState("Demo controlled original access");
+  const [requester, setRequester] = useState("Pejabat Dukcapil");
+  const [reason, setReason] = useState("Investigasi resmi No. 123/2026");
   const [governmentToken, setGovernmentToken] = useState("privai-government-demo-token");
   const [approverToken, setApproverToken] = useState("privai-approver-demo-token");
   
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [originalBlobUrl, setOriginalBlobUrl] = useState("");
 
   useEffect(() => {
     if (latestRecordId && !recordId) setRecordId(latestRecordId);
   }, [latestRecordId, recordId]);
 
   async function createRequest() {
-    setErrorMsg("");
+    setErrorMsg(""); setSuccessMsg("");
     const response = await safeRequest(() => createGovernmentAccessRequest({ recordId, requester, requesterRole: "verifier", reason, governmentToken }));
     if (response.ok) {
       setRequestId(String(response.data?.request_id ?? ""));
+      setSuccessMsg("Request berhasil dibuat. Menunggu otorisasi penyetuju.");
       setStep(2);
     } else {
       setErrorMsg(response.error?.message || "Gagal membuat request.");
@@ -552,10 +675,11 @@ function GovernmentAccess({ latestRecordId }: { latestRecordId: string }) {
   }
 
   async function approveRequest() {
-    setErrorMsg("");
-    const response = await safeRequest(() => approveGovernmentAccessRequest({ requestId, approvedBy: "Demo Approver", approverToken }));
+    setErrorMsg(""); setSuccessMsg("");
+    const response = await safeRequest(() => approveGovernmentAccessRequest({ requestId, approvedBy: "Hakim Ketua", approverToken }));
     if (response.ok) {
       setAccessToken(String(response.data?.one_time_access_token ?? ""));
+      setSuccessMsg("Otorisasi berhasil. Token akses diterbitkan.");
       setStep(3);
     } else {
       setErrorMsg(response.error?.message || "Gagal menyetujui request.");
@@ -563,96 +687,136 @@ function GovernmentAccess({ latestRecordId }: { latestRecordId: string }) {
   }
 
   async function downloadOriginal() {
-    setErrorMsg("");
+    setErrorMsg(""); setSuccessMsg("");
     const response = await safeRequest(() => downloadGovernmentOriginal({ requestId, accessToken, governmentToken }));
     if (response.ok && response.data) {
       const url = URL.createObjectURL(response.data.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = response.data.filename;
-      link.click();
-      URL.revokeObjectURL(url);
-      setSuccessMsg("Original berhasil diunduh.");
+      setOriginalBlobUrl(url);
+      setSuccessMsg("Dokumen ditarik dari vault. Siap untuk ditampilkan.");
       setStep(4);
     } else {
       if (response.error?.status === 403) {
-        setErrorMsg("Token sudah digunakan atau tidak valid.");
+        setErrorMsg("Token sudah digunakan atau tidak valid (Akses Ditolak).");
       } else {
-        setErrorMsg(response.error?.message || "Gagal mengunduh dokumen asli.");
+        setErrorMsg(response.error?.message || "Gagal menarik dokumen asli.");
       }
     }
   }
 
+  function handleCloseViewer() {
+    setViewerUrl("");
+    if (originalBlobUrl) {
+      URL.revokeObjectURL(originalBlobUrl);
+      setOriginalBlobUrl("");
+    }
+    setStep(1); // Reset back to start after viewing
+    setSuccessMsg("Sesi tampilan diakhiri dengan aman. Token satu kali telah hangus.");
+  }
+
   return (
     <div className="view-stack">
-      <Panel title="Pusat Otorisasi Dokumen Asli" eyebrow="Akses Pemerintah" icon={<Landmark />}>
-        <div className="stepper" style={{marginTop: '0', marginBottom: '32px'}}>
-          <div className={`step ${step >= 1 ? 'active' : ''}`}><div className="step-dot">1</div> Request</div>
-          <div className="step-line" />
-          <div className={`step ${step >= 2 ? 'active' : ''}`}><div className="step-dot">2</div> Approval</div>
-          <div className="step-line" />
-          <div className={`step ${step >= 3 ? 'active' : ''}`}><div className="step-dot">3</div> Token</div>
-          <div className="step-line" />
-          <div className={`step ${step >= 4 ? 'active' : ''}`}><div className="step-dot">4</div> Selesai</div>
-        </div>
+      {viewerUrl && (
+        <SecureViewer 
+          url={viewerUrl} 
+          title="DOKUMEN ASLI (RESTRICTED ACCESS)" 
+          onClose={handleCloseViewer} 
+          isSensitive={true} 
+        />
+      )}
 
-        {errorMsg && <div className="alert-card warning"><strong>Error</strong><p>{errorMsg}</p></div>}
-        {successMsg && <div className="alert-card success"><strong>Berhasil</strong><p>{successMsg}</p></div>}
+      <Panel title="Pusat Otorisasi Dokumen Asli" eyebrow="Government Access" icon={<Landmark />}>
+        {errorMsg && <div className="alert-card warning" style={{marginBottom: '24px'}}><strong>Akses Ditolak / Gagal</strong><p>{errorMsg}</p></div>}
+        {successMsg && <div className="alert-card success" style={{marginBottom: '24px'}}><strong>Pemberitahuan Sistem</strong><p>{successMsg}</p></div>}
 
-        <div className="two-column" style={{gap: '40px'}}>
-          <div className="form-stack">
+        <div className="two-column" style={{gap: '32px'}}>
+          <div className="gov-steps">
+            <div className={`gov-step ${step === 1 ? 'active' : ''}`}>
+              <div className="gov-step-icon">1</div>
+              <div className="gov-step-content">
+                <h4>Permohonan Akses</h4>
+                <p style={{margin:0, fontSize:'13px'}}>Pendaftaran alasan akses ke log audit.</p>
+              </div>
+            </div>
+            <div className={`gov-step ${step === 2 ? 'active' : ''}`}>
+              <div className="gov-step-icon">2</div>
+              <div className="gov-step-content">
+                <h4>Otorisasi Approver</h4>
+                <p style={{margin:0, fontSize:'13px'}}>Persetujuan dari pejabat berwenang.</p>
+              </div>
+            </div>
+            <div className={`gov-step ${step === 3 ? 'active' : ''}`}>
+              <div className="gov-step-icon">3</div>
+              <div className="gov-step-content">
+                <h4>Penerbitan Token</h4>
+                <p style={{margin:0, fontSize:'13px'}}>Penggunaan token sekali pakai.</p>
+              </div>
+            </div>
+            <div className={`gov-step ${step === 4 ? 'active' : ''}`}>
+              <div className="gov-step-icon">4</div>
+              <div className="gov-step-content">
+                <h4>Tampilan Aman</h4>
+                <p style={{margin:0, fontSize:'13px'}}>Penayangan langsung dengan pencegahan screenshot.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-stack" style={{background: 'var(--surface-strong)', padding: '24px', borderRadius: '16px'}}>
             {step === 1 && (
               <>
-                <Field label="Record ID"><input value={recordId} onChange={(e) => setRecordId(e.target.value)} placeholder="Masukkan Record ID" /></Field>
-                <Field label="Nama Pemohon"><input value={requester} onChange={(e) => setRequester(e.target.value)} /></Field>
-                <Field label="Alasan Akses"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-                <Field label="Government Token (Demo)"><input type="password" value={governmentToken} onChange={(e) => setGovernmentToken(e.target.value)} /></Field>
-                <button type="button" className="primary-button" onClick={createRequest} style={{marginTop: '8px'}}>Buat Request Akses</button>
+                <h4 style={{margin: '0 0 16px', color: 'var(--text)'}}>Lengkapi Detail Permohonan</h4>
+                <Field label="Record ID (Dokumen Sasaran)"><input value={recordId} onChange={(e) => setRecordId(e.target.value)} placeholder="Masukkan Record ID" /></Field>
+                <Field label="Nama Pemohon / Institusi"><input value={requester} onChange={(e) => setRequester(e.target.value)} /></Field>
+                <Field label="Alasan Akses (Akan dicatat di log)"><input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+                <Field label="Government Access Token"><input type="password" value={governmentToken} onChange={(e) => setGovernmentToken(e.target.value)} /></Field>
+                <button type="button" className="primary-button" onClick={createRequest} style={{marginTop: '12px', width: '100%'}}>Ajukan Permohonan Akses</button>
               </>
             )}
             
             {step === 2 && (
               <>
-                <div className="key-value-list" style={{marginBottom: '16px'}}>
+                <h4 style={{margin: '0 0 16px', color: 'var(--text)'}}>Otorisasi Diperlukan</h4>
+                <div className="key-value-list" style={{background: 'var(--bg)', padding: '16px', borderRadius: '12px', marginBottom: '16px'}}>
                   <div className="key-value-item"><span>Request ID</span><strong>{requestId}</strong></div>
-                  <div className="key-value-item"><span>Status</span><strong>Menunggu Persetujuan</strong></div>
+                  <div className="key-value-item"><span>Pemohon</span><strong>{requester}</strong></div>
+                  <div className="key-value-item"><span>Alasan</span><strong>{reason}</strong></div>
                 </div>
-                <Field label="Approver Token (Demo)"><input type="password" value={approverToken} onChange={(e) => setApproverToken(e.target.value)} /></Field>
-                <button type="button" className="primary-button" onClick={approveRequest} style={{marginTop: '8px'}}>Setujui Request</button>
+                <Field label="Approver Token (Otorisator)"><input type="password" value={approverToken} onChange={(e) => setApproverToken(e.target.value)} /></Field>
+                <button type="button" className="primary-button" onClick={approveRequest} style={{marginTop: '12px', width: '100%'}}>Setujui & Terbitkan Token</button>
               </>
             )}
 
             {step === 3 && (
               <>
+                <h4 style={{margin: '0 0 16px', color: 'var(--text)'}}>Tarik Dokumen Asli</h4>
                 <div className="alert-card warning">
-                  <KeyRound size={24} color="var(--warning)" />
+                  <KeyRound size={24} color="var(--warning)" style={{flexShrink: 0}} />
                   <div>
-                    <strong>Peringatan Keamanan</strong>
-                    <p>Token hanya ditampilkan sekali dan hanya dapat digunakan satu kali.</p>
+                    <strong>One-Time Access Token</strong>
+                    <p style={{fontSize: '12px'}}>Token ini hanya bisa digunakan tepat 1 kali. Jika tab direfresh atau token ditebak ulang, sistem otomatis memblokir akses (HTTP 403).</p>
                   </div>
                 </div>
-                <Field label="One-Time Access Token">
-                  <input value={accessToken} readOnly style={{fontFamily: 'monospace', background: 'var(--surface-strong)', color: 'var(--primary)'}} />
+                <Field label="Token Akses Anda">
+                  <input value={accessToken} readOnly style={{fontFamily: 'monospace', color: 'var(--danger)', fontWeight: 'bold'}} />
                 </Field>
-                <button type="button" className="primary-button" onClick={downloadOriginal} style={{marginTop: '8px'}}>Unduh Dokumen Asli</button>
+                <button type="button" className="primary-button" onClick={downloadOriginal} style={{marginTop: '12px', width: '100%'}}>Verifikasi Token & Buka Brankas</button>
               </>
             )}
 
             {step === 4 && (
-              <div className="empty-state-small" style={{textAlign: 'left'}}>
-                <h4 style={{margin: '0 0 8px 0', color: 'var(--success)'}}>Akses Selesai</h4>
-                <p style={{margin: 0, fontSize: '13px', color: 'var(--text)'}}>Dokumen original telah diunduh. Token akses telah hangus dan tidak dapat digunakan kembali.</p>
-                <button type="button" className="primary-button secondary-button" onClick={() => setStep(1)} style={{marginTop: '16px'}}>Buat Request Baru</button>
-              </div>
+              <>
+                 <h4 style={{margin: '0 0 16px', color: 'var(--success)'}}>Otorisasi Sukses</h4>
+                 <p style={{fontSize: '13px', lineHeight: '1.6', color: 'var(--text)', marginBottom: '24px'}}>
+                   Dokumen original telah berhasil di-dekripsi dan ditarik dari Sovereign Vault.
+                   Gambar akan ditampilkan dalam Mode Aman (mencegah screenshot dan klik kanan).
+                 </p>
+                 <button type="button" className="primary-button" onClick={() => setViewerUrl(originalBlobUrl)} style={{width: '100%', fontSize: '16px', padding: '16px'}}>
+                   TAMPILKAN DOKUMEN ORIGINAL
+                 </button>
+                 <button type="button" className="primary-button secondary-button" onClick={handleCloseViewer} style={{width: '100%', marginTop: '12px'}}>
+                   Akhiri Sesi
+                 </button>
+              </>
             )}
-          </div>
-          
-          <div style={{background: 'var(--surface-strong)', padding: '24px', borderRadius: '16px'}}>
-            <h4 style={{margin: '0 0 12px 0', color: 'var(--primary)'}}>Tentang Akses Pemerintah</h4>
-            <p style={{fontSize: '13px', lineHeight: '1.6', color: 'var(--muted)', margin: 0}}>
-              Proses ini memastikan bahwa dokumen identitas yang tidak disensor (original) tidak pernah tersentuh oleh operasional standar.
-              Dokumen asli hanya dapat diakses melalui portal Sovereign Vault yang membutuhkan autentikasi ganda (Pemohon & Penyetuju) serta mencatatkan aktivitas ini ke dalam Audit Log.
-            </p>
           </div>
         </div>
       </Panel>
@@ -673,6 +837,10 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
   });
   const [result, setResult] = useState<ApiResult<Record<string, unknown>> | null>(null);
 
+  const availableClasses = PRIVACY_CLASSES;
+  const activeClassesList = normalizePrivacyClasses(policy.active_classes);
+  const disabledClassesList = getDisabledPrivacyClasses(activeClassesList);
+
   function updateField(key: string, value: unknown) {
     setPolicy((current) => ({ ...current, [key]: value }));
   }
@@ -681,15 +849,16 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
     const response = await safeRequest(getRuntimePolicy);
     setResult(response);
     if (response.ok && response.data?.policy && typeof response.data.policy === "object") {
-      setPolicy(response.data.policy);
+      setPolicy(withDerivedPolicyClasses(response.data.policy));
     }
   }
 
   async function savePolicy() {
-    const response = await safeRequest(() => updateRuntimePolicy(policy)); 
+    const payload = withDerivedPolicyClasses(policy);
+    const response = await safeRequest(() => updateRuntimePolicy(payload)); 
     setResult(response); 
     if (response.ok && response.data?.policy && typeof response.data.policy === "object") {
-      setPolicy(response.data.policy);
+      setPolicy(withDerivedPolicyClasses(response.data.policy));
     }
     await onRefresh();
   }
@@ -698,7 +867,7 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
     const response = await safeRequest(resetRuntimePolicy);
     setResult(response);
     if (response.ok && response.data?.policy && typeof response.data.policy === "object") {
-      setPolicy(response.data.policy);
+      setPolicy(withDerivedPolicyClasses(response.data.policy));
     }
     await onRefresh();
   }
@@ -722,7 +891,16 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
                 {Object.keys(redactionConfig?.profiles ?? { government: null, live_webcam: null }).map((item) => <option key={item}>{item}</option>)}
               </select>
             </Field>
-            <Field label="Confidence Threshold"><input type="number" min="0.01" max="0.99" step="0.01" value={Number(policy.confidence_threshold ?? 0.35)} onChange={(e) => updateField("confidence_threshold", Number(e.target.value))} /></Field>
+            <Field label="Confidence Threshold">
+              <NumericInput
+                min={0.01}
+                max={0.99}
+                step={0.01}
+                value={Number(policy.confidence_threshold ?? 0.35)}
+                fallbackValue={0.35}
+                onValueChange={(value) => updateField("confidence_threshold", value)}
+              />
+            </Field>
             <Field label="Mode Redaksi">
               <select value={String(policy.redaction_mode ?? "black_box")} onChange={(e) => updateField("redaction_mode", e.target.value)}>
                 {(redactionConfig?.allowed_modes ?? ["black_box", "blur", "pixelate"]).map((item) => <option key={item}>{item}</option>)}
@@ -730,10 +908,25 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
             </Field>
           </div>
           
-          <div className="form-grid">
-            <Field label="Active Classes (CSV)"><input value={(policy.active_classes as string[] | undefined)?.join(",") ?? ""} onChange={(e) => updateField("active_classes", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} /></Field>
-            <Field label="Disabled Classes (CSV)"><input value={(policy.disabled_classes as string[] | undefined)?.join(",") ?? ""} onChange={(e) => updateField("disabled_classes", e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} /></Field>
+          <Field label="Target Kelas Aktif">
+            <ClassSelectionGrid
+              options={availableClasses}
+              selected={activeClassesList}
+              helper="Yang dipilih menjadi active_classes. Yang tidak dipilih otomatis menjadi disabled_classes."
+              onChange={(newSelected) => {
+                setPolicy((current) => ({
+                  ...current,
+                  active_classes: newSelected,
+                  disabled_classes: getDisabledPrivacyClasses(newSelected),
+                }));
+              }}
+            />
+          </Field>
+          <div className="policy-class-summary">
+            <span>Aktif: {activeClassesList.length ? activeClassesList.join(", ") : "Tidak ada"}</span>
+            <span>Nonaktif: {disabledClassesList.length ? disabledClassesList.join(", ") : "Tidak ada"}</span>
           </div>
+
           <Field label="Injection Note"><input value={String(policy.injection_note ?? "")} onChange={(e) => updateField("injection_note", e.target.value)} /></Field>
           
           <div className="button-row">
@@ -764,7 +957,7 @@ function LiveStream({ isActive }: { isActive: boolean }) {
   const [cameraIndex, setCameraIndex] = useState(0);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
   const [redactionMode, setRedactionMode] = useState("blur");
-  const [activeClasses, setActiveClasses] = useState("Wajah");
+  const [activeClasses, setActiveClasses] = useState<string[]>(["Wajah"]);
   const [targetWidth, setTargetWidth] = useState(640);
   const [inferIntervalMs, setInferIntervalMs] = useState(90);
   const [jpegQuality, setJpegQuality] = useState(75);
@@ -776,9 +969,8 @@ function LiveStream({ isActive }: { isActive: boolean }) {
   const [error, setError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
 
-  // Bangun URL stream dengan cache-buster baru setiap kali dibuka. URL stabil selama
-  // satu sesi (tidak reconnect saat re-render), tapi berubah saat stop->start ulang
-  // sehingga <img> benar-benar memuat ulang stream baru.
+  const classOptions = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
+
   function openStream() {
     setMjpegError(false);
     setError("");
@@ -789,9 +981,9 @@ function LiveStream({ isActive }: { isActive: boolean }) {
     const response = await safeRequest(() => getTurboLiveStatus(sessionId));
     if (response.ok) {
       setStatus(response.data ?? null);
-    } else {
-      setError(response.error?.message || "Gagal membaca status Live Camera.");
+      return;
     }
+    setError(response.error?.message || "Gagal membaca status Live Camera.");
   }
 
   async function startLiveCamera() {
@@ -803,17 +995,23 @@ function LiveStream({ isActive }: { isActive: boolean }) {
       cameraIndex,
       confidenceThreshold,
       redactionMode,
-      activeClasses,
+      activeClasses: activeClasses.join(","),
       targetWidth,
       inferIntervalMs,
       jpegQuality,
       boxHoldMs,
     }));
     setIsBusy(false);
+
     if (!response.ok) {
-      setError(response.error?.detail && typeof response.error.detail === "object" && "detail" in response.error.detail ? String((response.error.detail as Record<string, unknown>).detail) : response.error?.message || "Gagal memulai Live Camera.");
+      const detail = response.error?.detail;
+      const detailMessage = detail && typeof detail === "object" && "detail" in detail
+        ? String((detail as Record<string, unknown>).detail)
+        : "";
+      setError(detailMessage || response.error?.message || "Gagal memulai Live Camera.");
       return;
     }
+
     setStatus(response.data ?? null);
     openStream();
     setMessage("Live Camera berjalan dari kamera lokal backend.");
@@ -829,12 +1027,11 @@ function LiveStream({ isActive }: { isActive: boolean }) {
       setMjpegError(false);
       setMessage("Live Camera dihentikan.");
       setError("");
-    } else {
-      setError(response.error?.message || "Gagal menghentikan Live Camera.");
+      return;
     }
+    setError(response.error?.message || "Gagal menghentikan Live Camera.");
   }
 
-  // Polling status hanya berjalan saat view Live Camera sedang dibuka.
   useEffect(() => {
     if (!isActive) {
       if (statusIntervalRef.current) {
@@ -843,6 +1040,7 @@ function LiveStream({ isActive }: { isActive: boolean }) {
       }
       return;
     }
+
     void refreshStatus();
     statusIntervalRef.current = window.setInterval(() => void refreshStatus(), 2000);
     return () => {
@@ -851,7 +1049,7 @@ function LiveStream({ isActive }: { isActive: boolean }) {
         statusIntervalRef.current = null;
       }
     };
-  }, [isActive]);
+  }, [isActive, sessionId]);
 
   const running = status?.running === true;
   const latestStats = (status?.latest_stats ?? {}) as Record<string, unknown>;
@@ -866,7 +1064,9 @@ function LiveStream({ isActive }: { isActive: boolean }) {
       <div className="two-column">
         <Panel title="Pengaturan Live Camera" eyebrow="Backend Camera" icon={<Video />}>
           <div className="form-grid">
-            <Field label="Camera Index"><input type="number" min="0" value={cameraIndex} onChange={(event) => setCameraIndex(Number(event.target.value))} /></Field>
+            <Field label="Camera Index">
+              <NumericInput min={0} value={cameraIndex} fallbackValue={0} onValueChange={setCameraIndex} />
+            </Field>
             <Field label={`Confidence (${confidenceThreshold})`}>
               <input type="range" min="0.01" max="0.99" step="0.01" value={confidenceThreshold} onChange={(event) => setConfidenceThreshold(Number(event.target.value))} />
             </Field>
@@ -877,11 +1077,26 @@ function LiveStream({ isActive }: { isActive: boolean }) {
                 <option value="black_box">black_box</option>
               </select>
             </Field>
-            <Field label="Active Classes"><input value={activeClasses} onChange={(event) => setActiveClasses(event.target.value)} /></Field>
-            <Field label="Target Width"><input type="number" min="240" max="1280" value={targetWidth} onChange={(event) => setTargetWidth(Number(event.target.value))} /></Field>
-            <Field label="Infer Interval (ms)"><input type="number" min="50" max="2000" value={inferIntervalMs} onChange={(event) => setInferIntervalMs(Number(event.target.value))} /></Field>
-            <Field label="JPEG Quality"><input type="number" min="35" max="95" value={jpegQuality} onChange={(event) => setJpegQuality(Number(event.target.value))} /></Field>
-            <Field label="Box Hold (ms)"><input type="number" min="100" max="5000" value={boxHoldMs} onChange={(event) => setBoxHoldMs(Number(event.target.value))} /></Field>
+            <Field label="Target Classes">
+              <MultiSelectDropdown
+                label="Kelas"
+                options={classOptions}
+                selected={activeClasses}
+                onChange={setActiveClasses}
+              />
+            </Field>
+            <Field label="Target Width">
+              <NumericInput min={240} max={1280} value={targetWidth} fallbackValue={640} onValueChange={setTargetWidth} />
+            </Field>
+            <Field label="Infer Interval (ms)">
+              <NumericInput min={50} max={2000} value={inferIntervalMs} fallbackValue={90} onValueChange={setInferIntervalMs} />
+            </Field>
+            <Field label="JPEG Quality">
+              <NumericInput min={35} max={95} value={jpegQuality} fallbackValue={75} onValueChange={setJpegQuality} />
+            </Field>
+            <Field label="Box Hold (ms)">
+              <NumericInput min={100} max={5000} value={boxHoldMs} fallbackValue={700} onValueChange={setBoxHoldMs} />
+            </Field>
           </div>
           <div className="button-row">
             <button type="button" onClick={startLiveCamera} disabled={isBusy}>
@@ -932,7 +1147,6 @@ function LiveStream({ isActive }: { isActive: boolean }) {
             <div className="meta-item"><span>Latency</span><strong>{String(latestStats.latency_ms ?? 0)} ms</strong></div>
             <div className="meta-item"><span>Redacted</span><strong>{String(latestStats.redacted_count ?? 0)}</strong></div>
           </div>
-          <KtpAuthenticityPanel items={(status?.ktp_authenticity as KtpAuthenticityItem[]) ?? []} />
           <Collapsible title="Detail Status">
             <JsonBlock data={status} />
           </Collapsible>
@@ -956,7 +1170,9 @@ function AuditLogView({ initialLogs }: { initialLogs: ApiResult<{ logs: AuditLog
     <div className="view-stack">
       <Panel title="Pencarian Log" eyebrow="Audit Trail" icon={<Activity />}>
         <div className="form-grid">
-          <Field label="Limit Maksimal"><input type="number" value={filters.limit} onChange={(e) => setFilters({ ...filters, limit: Number(e.target.value) })} /></Field>
+          <Field label="Limit Maksimal">
+            <NumericInput min={1} max={200} value={filters.limit} fallbackValue={50} onValueChange={(value) => setFilters({ ...filters, limit: value })} />
+          </Field>
           <Field label="Filter Record ID"><input value={filters.recordId} onChange={(e) => setFilters({ ...filters, recordId: e.target.value })} placeholder="Opsional" /></Field>
           <Field label="Zone">
             <select value={filters.zone} onChange={(e) => setFilters({ ...filters, zone: e.target.value })}>
@@ -1018,6 +1234,165 @@ function AuditLogView({ initialLogs }: { initialLogs: ApiResult<{ logs: AuditLog
 }
 
 // UI Components
+function SecureViewer({ url, title, onClose, isSensitive }: { url: string; title: string; onClose: () => void; isSensitive: boolean }) {
+  const [isBlurred, setIsBlurred] = useState(false);
+
+  useEffect(() => {
+    const handleBlur = () => { if (isSensitive) setIsBlurred(true); };
+    const handleFocus = () => { if (isSensitive) setIsBlurred(false); };
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Basic anti-screenshot best effort
+      if (e.key === 'PrintScreen' || (e.metaKey && e.shiftKey && (e.key === 's' || e.key === 'S' || e.key === '3' || e.key === '4'))) {
+        if (isSensitive) {
+          setIsBlurred(true);
+          setTimeout(() => setIsBlurred(false), 3000);
+        }
+      }
+    };
+
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("keydown", handleKeyDown);
+    
+    // Disable right click globally while viewer is open if sensitive
+    const preventContext = (e: MouseEvent) => { if (isSensitive) e.preventDefault(); };
+    document.addEventListener("contextmenu", preventContext);
+
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("contextmenu", preventContext);
+    };
+  }, [isSensitive]);
+
+  return (
+    <div className="secure-modal-backdrop">
+      <div className="secure-modal-content">
+        <div className="secure-modal-header">
+          <h3>{isSensitive ? <ShieldCheck size={20} /> : <EyeOff size={20} />} {title}</h3>
+          <button className="secondary-button" style={{padding: '6px 16px', borderRadius: '8px'}} onClick={onClose}>Tutup</button>
+        </div>
+        <div className="secure-modal-body" onContextMenu={(e) => { if (isSensitive) e.preventDefault(); }}>
+          <div className="secure-image-container">
+            <img src={url} className={`secure-image ${isBlurred ? 'secure-blur' : ''}`} draggable="false" />
+            {isSensitive && (
+              <div className="secure-watermark">
+                CONFIDENTIAL • CONFIDENTIAL • CONFIDENTIAL<br />
+                RESTRICTED GOVERNMENT ACCESS ONLY
+              </div>
+            )}
+          </div>
+          <p style={{color: '#888', marginTop: '16px', fontSize: '13px', textAlign: 'center'}}>
+            {isSensitive ? "Tangkap layar (Screenshot) dan klik kanan dilarang. Aktivitas ini dipantau secara ketat." : "Mode pratinjau gambar."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClassSelectionGrid({
+  options,
+  selected,
+  onChange,
+  helper,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  helper?: string;
+}) {
+  const normalizedSelected = options.filter((option) => selected.includes(option));
+
+  function toggleOption(option: string) {
+    const nextSelected = normalizedSelected.includes(option)
+      ? normalizedSelected.filter((item) => item !== option)
+      : [...normalizedSelected, option];
+    onChange(options.filter((item) => nextSelected.includes(item)));
+  }
+
+  return (
+    <div className="class-toggle-panel">
+      <div className="class-toggle-toolbar">
+        <span>{normalizedSelected.length} dari {options.length} kelas aktif</span>
+        <div>
+          <button type="button" className="text-button" onClick={() => onChange([...options])}>Pilih Semua</button>
+          <button type="button" className="text-button" onClick={() => onChange([])}>Kosongkan</button>
+        </div>
+      </div>
+      <div className="class-toggle-grid">
+        {options.map((option) => {
+          const isActive = normalizedSelected.includes(option);
+          return (
+            <button
+              key={option}
+              type="button"
+              className={`class-toggle-card ${isActive ? "active" : ""}`}
+              onClick={() => toggleOption(option)}
+              aria-pressed={isActive}
+            >
+              <strong>{option}</strong>
+              <small>{isActive ? "Aktif" : "Nonaktif"}</small>
+            </button>
+          );
+        })}
+      </div>
+      {helper && <small className="field-hint">{helper}</small>}
+      {normalizedSelected.length === 0 && <small className="field-warning">Tidak ada kelas aktif. Hasil redaksi bisa kosong.</small>}
+    </div>
+  );
+}
+
+function MultiSelectDropdown({ options, selected, onChange, label }: { options: string[]; selected: string[]; onChange: (selected: string[]) => void; label: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const normalizedSelected = options.filter((option) => selected.includes(option));
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (opt: string) => {
+    const next = normalizedSelected.includes(opt)
+      ? normalizedSelected.filter((item) => item !== opt)
+      : [...normalizedSelected, opt];
+    onChange(options.filter((option) => next.includes(option)));
+  };
+
+  return (
+    <div className="multi-select-container" ref={containerRef}>
+      <button type="button" className="multi-select-trigger" onClick={() => setIsOpen(!isOpen)}>
+        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {normalizedSelected.length === 0 
+            ? `Pilih ${label}...` 
+            : normalizedSelected.length <= 2 
+              ? normalizedSelected.join(", ") 
+              : `${normalizedSelected.length} ${label} dipilih`}
+        </span>
+        {isOpen ? <ChevronDown size={16} style={{ flexShrink: 0 }} /> : <ChevronRight size={16} style={{ flexShrink: 0 }} />}
+      </button>
+      {isOpen && (
+        <div className="multi-select-popover">
+          {options.map((opt) => (
+            <button key={opt} type="button" className="multi-select-option" onClick={() => toggleOption(opt)}>
+              <input type="checkbox" checked={normalizedSelected.includes(opt)} readOnly tabIndex={-1} />
+              <span>{opt}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Panel({ title, eyebrow, icon, children }: { title: string; eyebrow: string; icon: ReactNode; children: ReactNode }) {
   return (
     <article className="panel">
@@ -1034,7 +1409,54 @@ function Panel({ title, eyebrow, icon, children }: { title: string; eyebrow: str
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="field"><span>{label}</span>{children}</label>;
+  return <div className="field"><span>{label}</span>{children}</div>;
+}
+
+function NumericInput({
+  value,
+  fallbackValue,
+  onValueChange,
+  min,
+  max,
+  step,
+}: {
+  value: number;
+  fallbackValue: number;
+  onValueChange: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) {
+      setDraft(String(value));
+    }
+  }, [value]);
+
+  function commitValue() {
+    const rawValue = draft.trim() === "" ? fallbackValue : Number(draft);
+    let nextValue = Number.isFinite(rawValue) ? rawValue : fallbackValue;
+    if (typeof min === "number") nextValue = Math.max(min, nextValue);
+    if (typeof max === "number") nextValue = Math.min(max, nextValue);
+    setDraft(String(nextValue));
+    onValueChange(nextValue);
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commitValue}
+    />
+  );
 }
 
 function JsonBlock({ data }: { data: unknown }) {
@@ -1050,81 +1472,6 @@ function Collapsible({ title, children }: { title: string; children: ReactNode }
         {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
       </div>
       {isOpen && <div className="collapsible-content">{children}</div>}
-    </div>
-  );
-}
-
-type KtpAuthenticityItem = {
-  class_name?: string;
-  confidence?: number;
-  verdict?: string;
-  fake_likelihood?: number;
-  reason?: string;
-  signals?: Record<string, unknown>;
-  nik?: { value_masked?: string | null; found?: boolean; valid?: boolean | null; issues?: string[] } | null;
-};
-
-function verdictMeta(verdict?: string): { label: string; badge: string } {
-  if (verdict === "genuine") return { label: "Indikasi Asli", badge: "green" };
-  if (verdict === "suspicious") return { label: "Mencurigakan", badge: "copper" };
-  if (verdict === "likely_fake") return { label: "Indikasi Palsu", badge: "danger" };
-  return { label: "Tidak Konklusif", badge: "muted" };
-}
-
-function fmtSignal(value: unknown): string {
-  const num = Number(value);
-  return Number.isFinite(num) ? num.toFixed(2) : "-";
-}
-
-function KtpAuthenticityPanel({ items }: { items: KtpAuthenticityItem[] }) {
-  if (!items || items.length === 0) return null;
-  return (
-    <div className="result-box" style={{ marginTop: "12px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-        <ShieldCheck size={18} color="var(--primary)" />
-        <strong>Keaslian KTP (Heuristik)</strong>
-      </div>
-      {items.map((item, index) => {
-        const meta = verdictMeta(item.verdict);
-        const likelihood = Math.round(Number(item.fake_likelihood ?? 0) * 100);
-        const signals = item.signals ?? {};
-        return (
-          <div
-            key={index}
-            style={{
-              borderTop: index > 0 ? "1px solid var(--surface-strong)" : "none",
-              paddingTop: index > 0 ? "12px" : 0,
-              marginTop: index > 0 ? "12px" : 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-              <div className={`badge ${meta.badge}`}>{meta.label}</div>
-              <small>Kemungkinan palsu: <strong>{likelihood}%</strong></small>
-              {item.reason && item.reason !== "ok" && (
-                <small style={{ color: "var(--muted)" }}>({item.reason})</small>
-              )}
-            </div>
-            <div className="meta-row" style={{ marginBottom: item.nik ? "8px" : 0 }}>
-              <div className="meta-item"><span>Moiré</span><strong>{fmtSignal(signals.moire)}</strong></div>
-              <div className="meta-item"><span>Ketajaman</span><strong>{fmtSignal(signals.sharpness)}</strong></div>
-              <div className="meta-item"><span>Glare PVC</span><strong>{fmtSignal(signals.glare_genuine)}</strong></div>
-              <div className="meta-item"><span>NIK Invalid</span><strong>{fmtSignal(signals.nik_invalid)}</strong></div>
-            </div>
-            {item.nik && (
-              <small style={{ color: "var(--muted)" }}>
-                NIK: {item.nik.found ? item.nik.value_masked : "tidak terbaca OCR"}
-                {item.nik.found &&
-                  (item.nik.valid
-                    ? " — struktur valid"
-                    : ` — masalah: ${(item.nik.issues ?? []).join(", ") || "-"}`)}
-              </small>
-            )}
-          </div>
-        );
-      })}
-      <small style={{ display: "block", marginTop: "10px", color: "var(--muted)" }}>
-        Indikator heuristik (FFT moiré + ketajaman + glare + struktur NIK), bukan vonis hukum.
-      </small>
     </div>
   );
 }

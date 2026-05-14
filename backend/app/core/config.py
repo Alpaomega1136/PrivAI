@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     crypto_admin_token: str = "privai-crypto-admin-demo-token"
 
     runtime_policy_path: Path = Path("./storage/config/runtime_policy.json")
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "https://localhost:5173,https://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_ROOT / ".env",
