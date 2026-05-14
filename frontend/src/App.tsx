@@ -17,7 +17,7 @@ import {
   Video,
   Copy
 } from "lucide-react";
-import { ChangeEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from "react";
+import { ChangeEvent, DragEvent, FormEvent, ReactNode, useCallback, useEffect, useState, useRef } from "react";
 
 import {
   ApiError,
@@ -66,6 +66,23 @@ type DashboardState = {
 const emptyResult = <T,>(): ApiResult<T> => ({ ok: false, error: { status: 0, message: "Not loaded" } });
 
 const PRIVACY_CLASSES = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
+const PERFORMANCE_MODES = [
+  {
+    value: "fast",
+    label: "Fast Demo",
+    description: "Recommended untuk live hackathon demo. 1x inference, tanpa OCR, tanpa heavy TTA.",
+  },
+  {
+    value: "balanced",
+    label: "Balanced",
+    description: "Recommended untuk verifikasi normal. TTA 0 dan 180, OCR mati default.",
+  },
+  {
+    value: "robust",
+    label: "Robust Verification",
+    description: "Untuk dokumen sulit. Lebih banyak rotasi, guardrail OCR-capable, lebih lambat.",
+  },
+];
 
 function formatWibDate(value: unknown): string {
   if (!value) return "-";
@@ -76,6 +93,12 @@ function formatWibDate(value: unknown): string {
     dateStyle: "medium",
     timeStyle: "medium",
   }).format(date);
+}
+
+function formatMs(value: unknown): string {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number)) return "0 ms";
+  return `${number >= 100 ? number.toFixed(0) : number.toFixed(1)} ms`;
 }
 
 function normalizePrivacyClasses(value: unknown, fallback: string[] = PRIVACY_CLASSES): string[] {
@@ -89,6 +112,26 @@ function normalizePrivacyClasses(value: unknown, fallback: string[] = PRIVACY_CL
 
 function getDisabledPrivacyClasses(activeClasses: string[]): string[] {
   return PRIVACY_CLASSES.filter((className) => !activeClasses.includes(className));
+}
+
+// Default confidence per kelas, dikalibrasi dari kurva F1/PR per kelas model.
+const DEFAULT_CLASS_CONFIDENCE: Record<string, number> = {
+  KTP: 0.35,
+  SIM: 0.35,
+  Paspor: 0.35,
+  NIK_Teks: 0.3,
+  Wajah: 0.25,
+  Plat_Nomor: 0.35,
+};
+
+function normalizeClassConfidence(value: unknown): Record<string, number> {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const result: Record<string, number> = {};
+  for (const className of PRIVACY_CLASSES) {
+    const candidate = Number(raw[className]);
+    result[className] = Number.isFinite(candidate) ? candidate : DEFAULT_CLASS_CONFIDENCE[className];
+  }
+  return result;
 }
 
 function withDerivedPolicyClasses(policy: Record<string, unknown>): Record<string, unknown> {
@@ -247,6 +290,8 @@ function Overview({ dashboard, records }: { dashboard: DashboardState; records: 
 function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionConfigResponse | null; onRefresh: () => Promise<void> }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.35);
   const [profile, setProfile] = useState("government");
   const [redactionMode, setRedactionMode] = useState("default");
@@ -256,15 +301,73 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
   const disabledClasses = getDisabledPrivacyClasses(activeClasses);
   
   const [useRuntimePolicy, setUseRuntimePolicy] = useState(false);
-  const [documentTta, setDocumentTta] = useState(true);
+  const [performanceMode, setPerformanceMode] = useState("fast");
+  const [authenticityOcr, setAuthenticityOcr] = useState(false);
   const [result, setResult] = useState<ApiResult<Record<string, unknown>> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const selectedPerformanceMode = PERFORMANCE_MODES.find((item) => item.value === performanceMode) ?? PERFORMANCE_MODES[0];
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  useEffect(() => {
+    if (performanceMode !== "robust" && authenticityOcr) {
+      setAuthenticityOcr(false);
+    }
+  }, [performanceMode, authenticityOcr]);
+
+  function selectFile(nextFile: File | null) {
+    setResult(null);
+    setFileError("");
+
+    if (!nextFile) {
+      setFile(null);
+      setPreview("");
+      return;
+    }
+
+    const isSupportedImage = nextFile.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(nextFile.name);
+    if (!isSupportedImage) {
+      setFile(null);
+      setPreview("");
+      setFileError("File harus berupa gambar JPG, PNG, atau WEBP.");
+      return;
+    }
+
+    setFile(nextFile);
+    setPreview(URL.createObjectURL(nextFile));
+  }
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] ?? null;
-    setFile(nextFile);
-    setPreview(nextFile ? URL.createObjectURL(nextFile) : "");
-    setResult(null);
+    selectFile(nextFile);
+    event.target.value = "";
+  }
+
+  function onFileDrag(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function onFileDragEnter(event: DragEvent<HTMLLabelElement>) {
+    onFileDrag(event);
+    setIsDraggingFile(true);
+  }
+
+  function onFileDragLeave(event: DragEvent<HTMLLabelElement>) {
+    onFileDrag(event);
+    setIsDraggingFile(false);
+  }
+
+  function onFileDrop(event: DragEvent<HTMLLabelElement>) {
+    onFileDrag(event);
+    setIsDraggingFile(false);
+    const nextFile = event.dataTransfer.files?.[0] ?? null;
+    selectFile(nextFile);
+    event.dataTransfer.clearData();
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -279,8 +382,8 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
       activeClasses: activeClasses.join(","), 
       disabledClasses: disabledClasses.join(","), 
       useRuntimePolicy, 
-      documentTta, 
-      ttaAngles: "0,180" 
+      performanceMode,
+      authenticityOcr: performanceMode === "robust" && authenticityOcr,
     }));
     setResult(nextResult);
     setIsSubmitting(false);
@@ -289,28 +392,52 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
 
   const redactedUrl = buildBackendFileUrl(readNestedString(result?.data, ["operational_zone", "redacted_file", "url"]));
   const detectionCount = result?.ok ? (result.data?.detections as any[])?.length ?? 0 : 0;
-  const redactedCount = result?.ok ? (result.data?.operational_zone as any)?.redacted_count ?? 0 : 0;
-  const latency = result?.ok ? (result.data?.metadata as any)?.latency_ms ?? 0 : 0;
-  const recordId = result?.ok ? (result.data?.operational_zone as any)?.record_id ?? "" : "";
+  const redactedCount = result?.ok ? Number(result.data?.redacted_count ?? 0) : 0;
+  const performance = result?.ok ? ((result.data?.performance as Record<string, unknown> | undefined) ?? null) : null;
+  const timing = result?.ok ? ((result.data?.timing as Record<string, unknown> | undefined) ?? null) : null;
+  const latency = result?.ok ? Number(timing?.total_ms ?? result.data?.total_latency_ms ?? result.data?.latency_ms ?? 0) : 0;
+  const detectorLatency = result?.ok ? Number(performance?.detector_latency_ms ?? result.data?.latency_ms ?? 0) : 0;
+  const recordId = result?.ok ? String(result.data?.record_id ?? "") : "";
   const rejectedDetections = result?.ok ? ((result.data?.rejected_detections as any[]) ?? []) : [];
   const validationSummary = result?.ok ? ((result.data?.validation_summary as Record<string, unknown> | undefined) ?? null) : null;
   const rejectedCount = Number(validationSummary?.rejected_count ?? rejectedDetections.length);
+  const timingItems = timing ? [
+    ["Total", timing.total_ms],
+    ["Inference", timing.inference_ms],
+    ["Guardrail", timing.guardrail_ms],
+    ["Redaction", timing.redaction_ms],
+    ["Storage", timing.storage_ms],
+    ["Vault", timing.vault_ms],
+  ] : [];
 
   return (
     <div className="view-stack">
       <div className="two-column">
         <Panel title="Upload Dokumen" eyebrow="Redaksi Visual" icon={<FileText />}>
           <form className="form-stack" onSubmit={submit}>
-            <label className="file-drop">
+            <label
+              className={`file-drop${isDraggingFile ? " is-dragging" : ""}${file ? " has-file" : ""}`}
+              onDragEnter={onFileDragEnter}
+              onDragOver={onFileDrag}
+              onDragLeave={onFileDragLeave}
+              onDrop={onFileDrop}
+            >
               <input type="file" accept="image/*" onChange={onFileChange} />
               <FileText size={32} color="var(--primary)" />
               <span>{file ? file.name : "Drag & drop atau pilih gambar"}</span>
-              <small>Mendukung format gambar standar (JPG, PNG)</small>
+              <small>{isDraggingFile ? "Lepaskan gambar di area ini" : "Mendukung format gambar standar (JPG, PNG, WEBP)"}</small>
             </label>
+            {fileError && <div className="field-warning">{fileError}</div>}
             
             <div className="form-grid">
               <Field label={`Confidence (${confidenceThreshold})`}>
                 <input type="range" min="0.01" max="0.99" step="0.01" value={confidenceThreshold} onChange={(e) => setConfidenceThreshold(Number(e.target.value))} />
+              </Field>
+              <Field label="Performance Mode">
+                <select value={performanceMode} onChange={(e) => setPerformanceMode(e.target.value)}>
+                  {PERFORMANCE_MODES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+                <small className="field-hint">{selectedPerformanceMode.description}</small>
               </Field>
               <Field label="Profile">
                 <select value={profile} onChange={(e) => setProfile(e.target.value)}>
@@ -336,7 +463,7 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
 
             <div className="inline-form">
               <label className="checkbox-line"><input type="checkbox" checked={useRuntimePolicy} onChange={(e) => setUseRuntimePolicy(e.target.checked)} /> Gunakan Dynamic Policy</label>
-              <label className="checkbox-line"><input type="checkbox" checked={documentTta} onChange={(e) => setDocumentTta(e.target.checked)} /> Document Rotation TTA</label>
+              <label className="checkbox-line"><input type="checkbox" checked={authenticityOcr} disabled={performanceMode !== "robust"} onChange={(e) => setAuthenticityOcr(e.target.checked)} /> OCR detail KTP</label>
             </div>
             
             <button className="primary-button" disabled={!file || isSubmitting}>
@@ -368,8 +495,9 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
                   </div>
                 </div>
                 <div className="meta-item">
-                  <span>Latency</span>
-                  <strong>{latency} ms</strong>
+                  <span>Total Latency</span>
+                  <strong>{formatMs(latency)}</strong>
+                  <small>Detector: {formatMs(detectorLatency)}</small>
                 </div>
                 <div className="meta-item">
                   <span>Deteksi</span>
@@ -384,6 +512,16 @@ function UserZone({ redactionConfig, onRefresh }: { redactionConfig: RedactionCo
                   <strong>{rejectedCount} objek</strong>
                 </div>
               </div>
+              {timingItems.length > 0 && (
+                <div className="timing-grid">
+                  {timingItems.map(([label, value]) => (
+                    <div className="timing-card" key={String(label)}>
+                      <span>{String(label)}</span>
+                      <strong>{formatMs(value)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
                 {(result.data?.detections as any[])?.map((d: any, i: number) => (
                   <div key={i} className={`badge ${String(d.guardrail_action) === "skip_redaction" ? "danger" : "copper"}`}>
@@ -836,21 +974,30 @@ function GovernmentAccess({ latestRecordId }: { latestRecordId: string }) {
 }
 
 function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: RedactionConfigResponse | null; onRefresh: () => Promise<void> }) {
-  const [policy, setPolicy] = useState<Record<string, unknown>>({ 
-    policy_name: "Default Government Policy", 
-    confidence_threshold: 0.35, 
-    profile: "government", 
-    redaction_mode: "black_box", 
-    active_classes: ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"], 
-    disabled_classes: [], 
-    label_text: "REDACTED", 
-    injection_note: "Frontend contract draft" 
+  const [policy, setPolicy] = useState<Record<string, unknown>>({
+    policy_name: "Default Government Policy",
+    confidence_threshold: 0.35,
+    class_confidence_threshold: { ...DEFAULT_CLASS_CONFIDENCE },
+    profile: "government",
+    redaction_mode: "black_box",
+    active_classes: ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"],
+    disabled_classes: [],
+    label_text: "REDACTED",
+    injection_note: "Frontend contract draft"
   });
   const [result, setResult] = useState<ApiResult<Record<string, unknown>> | null>(null);
 
   const availableClasses = PRIVACY_CLASSES;
   const activeClassesList = normalizePrivacyClasses(policy.active_classes);
   const disabledClassesList = getDisabledPrivacyClasses(activeClassesList);
+  const classConfidence = normalizeClassConfidence(policy.class_confidence_threshold);
+
+  function updateClassConfidence(className: string, value: number) {
+    setPolicy((current) => ({
+      ...current,
+      class_confidence_threshold: { ...normalizeClassConfidence(current.class_confidence_threshold), [className]: value },
+    }));
+  }
 
   function updateField(key: string, value: unknown) {
     setPolicy((current) => ({ ...current, [key]: value }));
@@ -937,6 +1084,26 @@ function DynamicInjection({ redactionConfig, onRefresh }: { redactionConfig: Red
             <span>Aktif: {activeClassesList.length ? activeClassesList.join(", ") : "Tidak ada"}</span>
             <span>Nonaktif: {disabledClassesList.length ? disabledClassesList.join(", ") : "Tidak ada"}</span>
           </div>
+
+          <Field label="Confidence Threshold per Kelas">
+            <div className="form-grid">
+              {availableClasses.map((className) => (
+                <Field key={className} label={className}>
+                  <NumericInput
+                    min={0.01}
+                    max={0.99}
+                    step={0.01}
+                    value={classConfidence[className]}
+                    fallbackValue={DEFAULT_CLASS_CONFIDENCE[className]}
+                    onValueChange={(value) => updateClassConfidence(className, value)}
+                  />
+                </Field>
+              ))}
+            </div>
+            <small className="field-hint">
+              Threshold deteksi per kelas, dikalibrasi dari kurva F1/PR. Kelas tanpa nilai pakai Confidence Threshold global sebagai fallback.
+            </small>
+          </Field>
 
           <Field label="Injection Note"><input value={String(policy.injection_note ?? "")} onChange={(e) => updateField("injection_note", e.target.value)} /></Field>
           

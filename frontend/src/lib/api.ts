@@ -96,6 +96,8 @@ export type RedactImageInput = {
   ttaAngles?: string;
   guardrailEnabled?: boolean;
   guardrailMode?: string;
+  authenticityOcr?: boolean;
+  performanceMode?: string;
 };
 
 export type LiveFrameInput = {
@@ -278,10 +280,12 @@ export function redactImage(input: RedactImageInput) {
   const params = new URLSearchParams();
   params.set("confidence_threshold", String(input.confidenceThreshold));
   params.set("profile", input.profile);
+  params.set("performance_mode", input.performanceMode || "fast");
   params.set("document_tta", String(input.documentTta ?? true));
-  params.set("tta_angles", input.ttaAngles || "0,180");
+  if (input.ttaAngles) params.set("tta_angles", input.ttaAngles);
   params.set("guardrail_enabled", String(input.guardrailEnabled ?? true));
-  params.set("guardrail_mode", input.guardrailMode || "precision_demo");
+  if (input.guardrailMode) params.set("guardrail_mode", input.guardrailMode);
+  params.set("authenticity_ocr", String(input.authenticityOcr ?? false));
   if (input.redactionMode && input.redactionMode !== "default") params.set("redaction_mode", input.redactionMode);
   if (input.activeClasses?.trim()) params.set("active_classes", input.activeClasses.trim());
   if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());

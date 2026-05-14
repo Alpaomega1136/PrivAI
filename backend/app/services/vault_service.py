@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -33,10 +34,12 @@ def _fingerprint(public_pem: bytes) -> str:
     return sha256_bytes(public_pem)[:32]
 
 
+@lru_cache(maxsize=16)
 def _load_public_key(path: str):
     return serialization.load_pem_public_key(Path(path).read_bytes())
 
 
+@lru_cache(maxsize=16)
 def _load_private_key(path: str):
     return serialization.load_pem_private_key(Path(path).read_bytes(), password=None)
 

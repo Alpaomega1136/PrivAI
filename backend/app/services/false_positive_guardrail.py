@@ -37,6 +37,7 @@ def apply_false_positive_guardrail(
     guardrail_mode: str,
     profile: str,
     active_classes: list[str],
+    ocr_enabled: bool = True,
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Post-process YOLO candidates before redaction.
@@ -51,7 +52,7 @@ def apply_false_positive_guardrail(
     if mode == "off":
         return _disabled_result(detections, profile, mode)
 
-    ocr_allowed = bool(config.get("ocr_enabled", True))
+    ocr_allowed = bool(ocr_enabled and config.get("ocr_enabled", True))
     annotated: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     validated: list[dict[str, Any]] = []

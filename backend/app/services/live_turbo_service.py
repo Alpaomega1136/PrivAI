@@ -154,11 +154,11 @@ class LiveTurboSession:
                 detections = prediction["detections"]
                 now = time.time()
 
-                # KTP authenticity — throttled (FFT + OCR are expensive). The previous
-                # result is held between runs so the indicator stays stable.
+                # KTP authenticity is visual-only in live mode so redaction FPS is not
+                # blocked by OCR. Full OCR remains available in document upload.
                 new_authenticity: list[dict[str, Any]] | None = None
                 if detections and (now - self.last_authenticity_ts) * 1000 >= _AUTHENTICITY_INTERVAL_MS:
-                    new_authenticity = analyze_detections(frame, detections, run_ocr=True)
+                    new_authenticity = analyze_detections(frame, detections, run_ocr=False)
                     self.last_authenticity_ts = now
 
                 with self.lock:

@@ -63,15 +63,29 @@ class YoloDetector:
         except Exception as exc:  # warm-up failure should not kill API
             self.load_error = f"warm-up warning: {exc}"
 
-    def predict(self, image: np.ndarray, confidence_threshold: float) -> dict[str, Any]:
+    def predict(
+        self,
+        image: np.ndarray,
+        confidence_threshold: float | dict[str, float],
+    ) -> dict[str, Any]:
         if not self.loaded or self.model is None:
             if self.model_exists and not self.loading:
                 self.load()
             if not self.loaded or self.model is None:
                 raise RuntimeError(self.load_error or "model not loaded")
 
+        # Per-class threshold: YOLO predict() hanya menerima conf skalar, jadi kita
+        # inference di floor = threshold terendah lalu post-filter tiap deteksi
+        # dengan threshold spesifik kelasnya.
+        if isinstance(confidence_threshold, dict):
+            class_thresholds: dict[str, float] | None = confidence_threshold
+            floor_conf = min(confidence_threshold.values()) if confidence_threshold else 0.01
+        else:
+            class_thresholds = None
+            floor_conf = float(confidence_threshold)
+
         started = time.perf_counter()
-        results = self.model.predict(image, conf=confidence_threshold, device=self.device, verbose=False)
+        results = self.model.predict(image, conf=floor_conf, device=self.device, verbose=False)
         latency_ms = (time.perf_counter() - started) * 1000
         detections: list[dict[str, Any]] = []
         if results:
@@ -87,6 +101,10 @@ class YoloDetector:
                     except Exception:
                         class_name = "Unknown"
                     confidence = float(box.conf[0].item()) if hasattr(box.conf[0], "item") else float(box.conf[0])
+                    if class_thresholds is not None:
+                        min_conf = class_thresholds.get(class_name, floor_conf)
+                        if confidence < min_conf:
+                            continue
                     coords = box.xyxy[0].tolist()
                     detections.append(
                         {

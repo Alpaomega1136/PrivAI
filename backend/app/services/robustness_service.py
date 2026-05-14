@@ -48,7 +48,7 @@ def _nms(detections: list[dict[str, Any]], threshold: float) -> list[dict[str, A
     return kept
 
 
-def robust_predict_with_tta(detector, image: np.ndarray, confidence_threshold: float, tta_angles: str = "0,180", iou_threshold: float = 0.55) -> dict[str, Any]:
+def robust_predict_with_tta(detector, image: np.ndarray, confidence_threshold: float | dict[str, float], tta_angles: str = "0,180", iou_threshold: float = 0.55) -> dict[str, Any]:
     height, width = image.shape[:2]
     angles = []
     for item in tta_angles.split(","):

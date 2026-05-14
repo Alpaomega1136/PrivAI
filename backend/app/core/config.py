@@ -1,13 +1,28 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+# Per-class confidence defaults, dikalibrasi dari kurva F1/PR per kelas
+# (model.val() pada privai_epoch50). Strong classes (KTP/SIM/Paspor/NIK_Teks,
+# AP>0.99) punya plateau F1 lebar -> threshold rendah-sedang tanpa buang recall.
+# Wajah (AP 0.970) kelas lemah + privacy-critical -> paling rendah demi recall.
+# Plat_Nomor (AP 0.968) F1 jatuh di conf<0.15 (banyak FP) -> floor dijaga.
+# Untuk redaksi PII, bias ke recall tinggi (false negative = bocor data).
+DEFAULT_CLASS_CONFIDENCE: Dict[str, float] = {
+    "KTP": 0.35,
+    "SIM": 0.35,
+    "Paspor": 0.35,
+    "NIK_Teks": 0.30,
+    "Wajah": 0.25,
+    "Plat_Nomor": 0.35,
+}
 
 
 class Settings(BaseSettings):
@@ -17,6 +32,7 @@ class Settings(BaseSettings):
 
     model_path: Path = Path("./models/privai_epoch50.pt")
     model_confidence: float = Field(default=0.35, ge=0.01, le=0.99)
+    model_class_confidence: Dict[str, float] = Field(default_factory=lambda: dict(DEFAULT_CLASS_CONFIDENCE))
     model_device: str = "cpu"
 
     database_url: str = "sqlite:///./storage/privai.db"
