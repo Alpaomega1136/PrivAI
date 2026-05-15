@@ -440,10 +440,10 @@ export function getRequiredBackendEndpoints() {
     { method: "GET", path: "/api/government/access-requests/{request_id}", feature: "Access request status" },
     { method: "GET", path: "/api/government/access-requests/{request_id}/secure-original", feature: "One-time original download" },
     { method: "GET", path: "/api/audit-logs", feature: "Security event trace" },
-    { method: "POST", path: "/api/live/redact-frame", feature: "Ephemeral live webcam frame redaction" },
-    { method: "POST", path: "/api/live/turbo/start", feature: "Start backend camera live stream" },
-    { method: "POST", path: "/api/live/turbo/stop", feature: "Stop backend camera live stream" },
-    { method: "GET", path: "/api/live/turbo/status", feature: "Live stream status" },
-    { method: "GET", path: "/api/live/turbo/mjpeg", feature: "MJPEG redacted live output" },
+    { method: "POST", path: "/api/live/redact-frame", feature: "Browser camera frame redaction" },
+    { method: "POST", path: "/api/live/turbo/start", feature: "Optional local-only backend camera stream" },
+    { method: "POST", path: "/api/live/turbo/stop", feature: "Stop optional backend camera stream" },
+    { method: "GET", path: "/api/live/turbo/status", feature: "Optional backend camera stream status" },
+    { method: "GET", path: "/api/live/turbo/mjpeg", feature: "Optional backend MJPEG redacted output" },
   ];
 }

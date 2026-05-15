@@ -252,7 +252,11 @@ PrivAI/
 
 ## Menjalankan Lokal
 
-### Backend
+### 1. Jalankan Backend
+
+Backend berjalan di `http://127.0.0.1:8000`.
+
+Jika virtual environment belum dibuat:
 
 ```powershell
 cd D:\PrivAI\backend
@@ -260,17 +264,36 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
+```
+
+Jika `.venv` sudah ada:
+
+```powershell
+cd D:\PrivAI\backend
+.\.venv\Scripts\Activate.ps1
+```
+
+Jalankan server:
+
+```powershell
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Backend lokal:
+Cek backend:
+
+```powershell
+curl.exe http://127.0.0.1:8000/api/health
+```
+
+Dokumentasi API lokal:
 
 ```text
-http://127.0.0.1:8000
 http://127.0.0.1:8000/docs
 ```
 
-### Frontend
+### 2. Jalankan Frontend
+
+Frontend berjalan di `http://localhost:5173`.
 
 ```powershell
 cd D:\PrivAI\frontend
@@ -278,11 +301,33 @@ npm install
 npm run dev
 ```
 
-Frontend lokal:
+Buka di browser:
 
 ```text
 http://localhost:5173
 ```
+
+Frontend development memakai Vite proxy. Request `/api/*` dari frontend akan diteruskan ke backend lokal `http://127.0.0.1:8000`, jadi tidak perlu mengubah URL API manual saat development.
+
+### 3. Live Stream Lokal
+
+Live Stream punya dua pipeline:
+
+| Pipeline | Dipakai Untuk | Catatan |
+|---|---|---|
+| Browser Camera | Local dan deploy online. | Kamera dibuka oleh browser user. Gunakan `http://localhost:5173` saat lokal atau HTTPS saat deploy. |
+| Local Backend Camera | Fallback lokal. | Kamera dibuka oleh OpenCV dari backend lokal. Tidak cocok untuk Azure Container Apps karena container tidak punya webcam user. |
+
+Untuk demo lokal yang paling stabil:
+
+1. Jalankan backend di `127.0.0.1:8000`.
+2. Jalankan frontend di `localhost:5173`.
+3. Buka `http://localhost:5173`.
+4. Masuk `Live Stream Track`.
+5. Pilih `Browser Camera`.
+6. Jika browser tetap menolak izin kamera, pilih `Local Backend Camera`.
+
+Untuk deploy online, gunakan `Browser Camera` karena kamera harus berasal dari browser user, bukan dari container backend.
 
 ## Environment Penting
 
@@ -302,6 +347,7 @@ Frontend development:
 
 ```env
 VITE_API_PROXY_TARGET=http://127.0.0.1:8000
+VITE_DEV_HTTPS=false
 ```
 
 Frontend production:
@@ -329,11 +375,11 @@ VITE_API_BASE_URL=https://privai-backend.orangebeach-03038aed.southeastasia.azur
 | POST | `/api/government/access-requests/{request_id}/approve` | Approve request. |
 | GET | `/api/government/access-requests/{request_id}/secure-original` | Download original dengan one-time token. |
 | GET | `/api/audit-logs` | Lihat audit log. |
-| POST | `/api/live/redact-frame` | Redaksi satu frame ephemeral. |
-| POST | `/api/live/turbo/start` | Start live stream backend camera. |
-| POST | `/api/live/turbo/stop` | Stop live stream. |
-| GET | `/api/live/turbo/status` | Status live stream. |
-| GET | `/api/live/turbo/mjpeg` | MJPEG redacted stream. |
+| POST | `/api/live/redact-frame` | Redaksi satu frame ephemeral dari Browser Camera. |
+| POST | `/api/live/turbo/start` | Start Local Backend Camera stream untuk fallback lokal. |
+| POST | `/api/live/turbo/stop` | Stop Local Backend Camera stream. |
+| GET | `/api/live/turbo/status` | Status Local Backend Camera stream. |
+| GET | `/api/live/turbo/mjpeg` | MJPEG redacted stream untuk Local Backend Camera. |
 
 ## Quick Test
 

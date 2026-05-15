@@ -9,67 +9,311 @@ import { NumericInput } from "../../components/ui/NumericInput";
 import {
   buildTurboMjpegUrl,
   getTurboLiveStatus,
+  redactLiveFrame,
   safeRequest,
   startTurboLive,
   stopTurboLive,
 } from "../../lib/api";
 import { PRIVACY_CLASSES } from "../../lib/constants";
 
+type BrowserCameraDevice = {
+  deviceId: string;
+  label: string;
+};
+
+type CameraPipeline = "browser" | "backend";
+
 const PAGE_ASSETS = {
   banner: "" as string,
 };
 
-const CAMERA_OPTIONS = [
-  { index: 0, label: "Built-in / Main Camera", helper: "Camera 0 - default laptop atau webcam utama." },
-  { index: 1, label: "External USB Webcam", helper: "Camera 1 - webcam tambahan yang tersambung." },
-  { index: 2, label: "Virtual Camera / OBS", helper: "Camera 2 - virtual camera atau capture device." },
+const BACKEND_CAMERA_OPTIONS = [
+  { index: 0, label: "Local Backend Camera 0", helper: "Default laptop camera or main webcam." },
+  { index: 1, label: "Local Backend Camera 1", helper: "External USB webcam if connected." },
+  { index: 2, label: "Local Backend Camera 2", helper: "Virtual camera, OBS, or capture device." },
 ];
 
+function isCameraAvailableInBrowser() {
+  return Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
+function isSecureCameraContext() {
+  return window.isSecureContext || ["localhost", "127.0.0.1"].includes(window.location.hostname);
+}
+
+function isLocalOrPrivateFrontendHost() {
+  const host = window.location.hostname;
+  if (["localhost", "127.0.0.1", "::1"].includes(host)) return true;
+  if (/^10\./.test(host)) return true;
+  if (/^192\.168\./.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
+  return false;
+}
+
+function stopMediaStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+function isPermissionDeniedError(error: unknown) {
+  return error instanceof DOMException && ["NotAllowedError", "PermissionDeniedError", "SecurityError"].includes(error.name);
+}
+
+function cameraErrorMessage(error: unknown) {
+  if (error instanceof DOMException) {
+    if (isPermissionDeniedError(error)) {
+      return "Browser blocked camera access. Click the lock icon in the address bar, set Camera to Allow, then reload.";
+    }
+    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      return "No camera was detected on this device.";
+    }
+    if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+      return "Camera exists but is currently used by another app or blocked by the operating system.";
+    }
+    if (error.name === "OverconstrainedError" || error.name === "ConstraintNotSatisfiedError") {
+      return "The selected camera is unavailable. Choose Default Browser Camera and try again.";
+    }
+    return error.message || error.name;
+  }
+  return error instanceof Error ? error.message : "Failed to open browser camera.";
+}
+
+function apiErrorMessage(error: { message?: string; detail?: unknown } | undefined, fallback: string) {
+  const detail = error?.detail;
+  if (detail && typeof detail === "object" && "detail" in detail) {
+    return String((detail as Record<string, unknown>).detail);
+  }
+  if (typeof detail === "string" && detail.trim()) return detail;
+  return error?.message || fallback;
+}
+
+async function getCameraPermissionState() {
+  if (!navigator.permissions?.query) return "unknown";
+  try {
+    const status = await navigator.permissions.query({ name: "camera" as PermissionName });
+    return status.state;
+  } catch {
+    return "unknown";
+  }
+}
+
 export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const browserIntervalRef = useRef<number | null>(null);
   const statusIntervalRef = useRef<number | null>(null);
+  const inFlightRef = useRef(false);
+  const runningRef = useRef(false);
+  const settingsRef = useRef({
+    selectedDeviceId: "",
+    confidenceThreshold: 0.25,
+    redactionMode: "blur",
+    activeClasses: ["Wajah"],
+    targetWidth: 640,
+    inferIntervalMs: 450,
+    jpegQuality: 75,
+    selectedCameraLabel: "Default Browser Camera",
+  });
 
   const [sessionId] = useState("default");
-  const [cameraIndex, setCameraIndex] = useState(0);
+  const [cameraPipeline, setCameraPipeline] = useState<CameraPipeline>("browser");
+  const [activeSource, setActiveSource] = useState<CameraPipeline | null>(null);
+  const [cameraDevices, setCameraDevices] = useState<BrowserCameraDevice[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+  const [backendCameraIndex, setBackendCameraIndex] = useState(0);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
   const [redactionMode, setRedactionMode] = useState("blur");
   const [activeClasses, setActiveClasses] = useState<string[]>(["Wajah"]);
   const [targetWidth, setTargetWidth] = useState(640);
-  const [inferIntervalMs, setInferIntervalMs] = useState(90);
+  const [inferIntervalMs, setInferIntervalMs] = useState(450);
   const [jpegQuality, setJpegQuality] = useState(75);
   const [boxHoldMs, setBoxHoldMs] = useState(700);
   const [status, setStatus] = useState<Record<string, unknown> | null>(null);
-  const [streamUrl, setStreamUrl] = useState("");
+  const [processedFrameSrc, setProcessedFrameSrc] = useState("");
+  const [backendStreamUrl, setBackendStreamUrl] = useState("");
   const [mjpegError, setMjpegError] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [cameraPermissionState, setCameraPermissionState] = useState("unknown");
 
   const classOptions = PRIVACY_CLASSES;
-  const selectedCamera = CAMERA_OPTIONS.find((camera) => camera.index === cameraIndex) ?? CAMERA_OPTIONS[0];
+  const selectedBrowserCamera =
+    cameraDevices.find((camera) => camera.deviceId === selectedDeviceId) ??
+    cameraDevices[0] ?? { deviceId: "", label: "Default Browser Camera" };
+  const selectedBackendCamera =
+    BACKEND_CAMERA_OPTIONS.find((camera) => camera.index === backendCameraIndex) ?? BACKEND_CAMERA_OPTIONS[0];
+  const selectedCameraLabel = cameraPipeline === "backend" ? selectedBackendCamera.label : selectedBrowserCamera.label;
 
-  function openStream() {
-    setMjpegError(false);
-    setError("");
-    setStreamUrl(`${buildTurboMjpegUrl(sessionId)}&t=${Date.now()}`);
-  }
+  settingsRef.current = {
+    selectedDeviceId,
+    confidenceThreshold,
+    redactionMode,
+    activeClasses,
+    targetWidth,
+    inferIntervalMs,
+    jpegQuality,
+    selectedCameraLabel,
+  };
 
-  async function refreshStatus() {
-    const response = await safeRequest(() => getTurboLiveStatus(sessionId));
-    if (response.ok) {
-      setStatus(response.data ?? null);
+  async function refreshCameraDevices() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setCameraPermissionState("unsupported");
       return;
     }
-    setError(response.error?.message || "Gagal membaca status Live Camera.");
+
+    try {
+      const permissionState = await getCameraPermissionState();
+      setCameraPermissionState(permissionState);
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices
+        .filter((device) => device.kind === "videoinput")
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${index}`,
+        }));
+      setCameraDevices(videoDevices);
+      if (!selectedDeviceId && permissionState === "granted" && videoDevices[0]?.deviceId) {
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch {
+      setCameraPermissionState("unknown");
+    }
   }
 
-  async function startLiveCamera() {
+  async function captureFrameBlob() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return null;
+    if (!video.videoWidth || !video.videoHeight) return null;
+
+    const settings = settingsRef.current;
+    const width = Math.min(settings.targetWidth, video.videoWidth);
+    const height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * width));
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(video, 0, 0, width, height);
+
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", settings.jpegQuality / 100);
+    });
+  }
+
+  async function requestBrowserCameraStream() {
+    const settings = settingsRef.current;
+    const baseVideoConstraints: MediaTrackConstraints = {
+      width: { ideal: settings.targetWidth },
+      frameRate: { ideal: 12, max: 20 },
+    };
+    const attempts: Array<MediaTrackConstraints | boolean> = [];
+
+    if (settings.selectedDeviceId) {
+      attempts.push({ ...baseVideoConstraints, deviceId: { exact: settings.selectedDeviceId } });
+    }
+    attempts.push({ ...baseVideoConstraints, facingMode: "user" });
+    attempts.push(true);
+
+    let lastError: unknown = null;
+    for (const video of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: false, video });
+      } catch (cameraError) {
+        if (isPermissionDeniedError(cameraError)) throw cameraError;
+        lastError = cameraError;
+      }
+    }
+    throw lastError ?? new Error("Failed to open browser camera.");
+  }
+
+  async function processBrowserFrame() {
+    if (!runningRef.current || activeSource !== "browser" || inFlightRef.current) return;
+
+    const frameBlob = await captureFrameBlob();
+    if (!frameBlob) return;
+
+    const settings = settingsRef.current;
+    inFlightRef.current = true;
+    const response = await safeRequest(() =>
+      redactLiveFrame({
+        frameBlob,
+        confidenceThreshold: settings.confidenceThreshold,
+        redactionMode: settings.redactionMode,
+        activeClasses: settings.activeClasses.join(","),
+      }),
+    );
+    inFlightRef.current = false;
+
+    if (!runningRef.current || activeSource !== "browser") return;
+
+    if (!response.ok) {
+      setError(apiErrorMessage(response.error, "Failed to process live frame."));
+      return;
+    }
+
+    const data = response.data ?? {};
+    const frameBase64 = typeof data.frame_image_base64 === "string" ? data.frame_image_base64 : "";
+    const mimeType = typeof data.mime_type === "string" ? data.mime_type : "image/jpeg";
+    if (frameBase64) {
+      setProcessedFrameSrc(`data:${mimeType};base64,${frameBase64}`);
+    }
+
+    setStatus((previous) => {
+      const previousFrameCounter = Number(previous?.frame_counter ?? 0);
+      const previousInferenceCounter = Number(previous?.inference_counter ?? 0);
+      return {
+        running: true,
+        source: "browser_camera",
+        camera_label: settings.selectedCameraLabel,
+        frame_counter: previousFrameCounter + 1,
+        inference_counter: previousInferenceCounter + 1,
+        latest_stats: {
+          latency_ms: data.latency_ms ?? 0,
+          detection_count: data.detection_count ?? 0,
+          redacted_count: data.redacted_count ?? 0,
+        },
+        privacy_policy: data.storage_policy,
+      };
+    });
+  }
+
+  function startBrowserProcessingLoop() {
+    if (browserIntervalRef.current) {
+      window.clearInterval(browserIntervalRef.current);
+      browserIntervalRef.current = null;
+    }
+    void processBrowserFrame();
+    browserIntervalRef.current = window.setInterval(
+      () => void processBrowserFrame(),
+      Math.max(120, settingsRef.current.inferIntervalMs),
+    );
+  }
+
+  function stopBrowserProcessingLoop() {
+    if (browserIntervalRef.current) {
+      window.clearInterval(browserIntervalRef.current);
+      browserIntervalRef.current = null;
+    }
+    inFlightRef.current = false;
+  }
+
+  async function startBackendLiveCamera(note?: string) {
     setIsBusy(true);
     setError("");
-    setMessage("");
+    setMessage(note || "");
+    stopBrowserProcessingLoop();
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    setProcessedFrameSrc("");
+    setMjpegError(false);
+
     const response = await safeRequest(() =>
       startTurboLive({
         sessionId,
-        cameraIndex,
+        cameraIndex: backendCameraIndex,
         confidenceThreshold,
         redactionMode,
         activeClasses: activeClasses.join(","),
@@ -79,60 +323,171 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
         boxHoldMs,
       }),
     );
-    setIsBusy(false);
 
     if (!response.ok) {
-      const detail = response.error?.detail;
-      const detailMessage =
-        detail && typeof detail === "object" && "detail" in detail
-          ? String((detail as Record<string, unknown>).detail)
-          : "";
-      setError(detailMessage || response.error?.message || "Gagal memulai Live Camera.");
+      runningRef.current = false;
+      setRunning(false);
+      setActiveSource(null);
+      setIsBusy(false);
+      setError(apiErrorMessage(response.error, "Failed to start local backend camera."));
       return;
     }
 
+    runningRef.current = true;
+    setRunning(true);
+    setActiveSource("backend");
+    setCameraPipeline("backend");
     setStatus(response.data ?? null);
-    openStream();
-    setMessage(`${selectedCamera.label} aktif. PrivAI sedang meredaksi frame secara ephemeral.`);
+    setBackendStreamUrl(`${buildTurboMjpegUrl(sessionId)}&t=${Date.now()}`);
+    setMessage(note || `${selectedBackendCamera.label} active through local backend camera fallback.`);
+    setIsBusy(false);
+  }
+
+  async function startBrowserLiveCamera(allowLocalBackendFallback = true) {
+    setIsBusy(true);
+    setError("");
+    setMessage("");
+
+    if (!isSecureCameraContext()) {
+      setIsBusy(false);
+      setError("Browser camera requires HTTPS or localhost. For local demo, open http://localhost:5173.");
+      return;
+    }
+
+    if (!isCameraAvailableInBrowser()) {
+      setIsBusy(false);
+      setError("This browser does not support camera access. Use recent Chrome, Edge, or Firefox.");
+      return;
+    }
+
+    try {
+      stopBrowserProcessingLoop();
+      stopMediaStream(streamRef.current);
+      const stream = await requestBrowserCameraStream();
+      const settings = settingsRef.current;
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      runningRef.current = true;
+      setRunning(true);
+      setActiveSource("browser");
+      setBackendStreamUrl("");
+      setProcessedFrameSrc("");
+      setStatus({
+        running: true,
+        source: "browser_camera",
+        camera_label: settings.selectedCameraLabel,
+        frame_counter: 0,
+        inference_counter: 0,
+        latest_stats: {},
+      });
+      await refreshCameraDevices();
+      setCameraPermissionState(await getCameraPermissionState());
+      startBrowserProcessingLoop();
+      setMessage(`${settings.selectedCameraLabel} active. Frames are sent ephemerally to backend redaction.`);
+    } catch (cameraError) {
+      stopMediaStream(streamRef.current);
+      streamRef.current = null;
+      runningRef.current = false;
+      setRunning(false);
+      setActiveSource(null);
+      setCameraPermissionState(await getCameraPermissionState());
+
+      if (allowLocalBackendFallback && isLocalOrPrivateFrontendHost()) {
+        setIsBusy(false);
+        await startBackendLiveCamera("Browser camera was denied. Using Local Backend Camera fallback for local demo.");
+        return;
+      }
+
+      setError(`${cameraErrorMessage(cameraError)} For deployed demo, the browser permission must be allowed.`);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function startLiveCamera() {
+    if (cameraPipeline === "backend") {
+      await startBackendLiveCamera();
+      return;
+    }
+    await startBrowserLiveCamera(true);
   }
 
   async function stopLiveCamera() {
     setIsBusy(true);
-    const response = await safeRequest(() => stopTurboLive(sessionId));
-    setIsBusy(false);
-    if (response.ok) {
-      setStatus(response.data ?? null);
-      setStreamUrl("");
-      setMjpegError(false);
-      setMessage("Live stream dihentikan.");
-      setError("");
-      return;
+    stopBrowserProcessingLoop();
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+
+    if (activeSource === "backend" || cameraPipeline === "backend") {
+      await safeRequest(() => stopTurboLive(sessionId));
     }
-    setError(response.error?.message || "Gagal menghentikan Live Camera.");
+
+    runningRef.current = false;
+    setRunning(false);
+    setActiveSource(null);
+    setProcessedFrameSrc("");
+    setBackendStreamUrl("");
+    setMjpegError(false);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setStatus((previous) => ({ ...(previous ?? {}), running: false }));
+    setMessage("Live stream stopped.");
+    setError("");
+    setIsBusy(false);
   }
 
   useEffect(() => {
-    if (!isActive) {
-      if (statusIntervalRef.current) {
-        window.clearInterval(statusIntervalRef.current);
-        statusIntervalRef.current = null;
-      }
-      return;
+    if (isActive) {
+      void refreshCameraDevices();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
 
-    void refreshStatus();
-    statusIntervalRef.current = window.setInterval(() => void refreshStatus(), 2000);
+  useEffect(() => {
+    if (runningRef.current && activeSource === "browser") {
+      startBrowserProcessingLoop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inferIntervalMs, activeSource]);
+
+  useEffect(() => {
+    if (!running || activeSource !== "backend") return undefined;
+    statusIntervalRef.current = window.setInterval(async () => {
+      const response = await safeRequest(() => getTurboLiveStatus(sessionId));
+      if (response.ok) setStatus(response.data ?? null);
+    }, 1500);
     return () => {
       if (statusIntervalRef.current) {
         window.clearInterval(statusIntervalRef.current);
         statusIntervalRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, sessionId]);
+  }, [running, activeSource, sessionId]);
 
-  const running = status?.running === true;
+  useEffect(() => {
+    return () => {
+      stopBrowserProcessingLoop();
+      stopMediaStream(streamRef.current);
+      void safeRequest(() => stopTurboLive(sessionId));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const latestStats = (status?.latest_stats ?? {}) as Record<string, unknown>;
+  const sourceLabel =
+    activeSource === "backend"
+      ? "Local Backend"
+      : activeSource === "browser"
+        ? "Browser"
+        : cameraPipeline === "backend"
+          ? "Local Backend"
+          : "Browser";
 
   return (
     <div className="view-stack user-live-page">
@@ -141,8 +496,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
         <div className="user-hero-copy">
           <h1>Live Stream Privacy Filter.</h1>
           <p>
-            Kamera backend diproses seperti live platform: tampilkan feed, aktifkan redaksi, dan jaga frame tetap
-            ephemeral tanpa masuk vault maupun storage.
+            Deployed mode uses browser camera through HTTPS. Local mode can fall back to backend OpenCV camera when
+            browser permission is blocked.
           </p>
         </div>
       </section>
@@ -156,40 +511,56 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
             </div>
             <div className="live-stream-title">
               <strong>PrivAI Secure Stream</strong>
-              <small>{selectedCamera.label}</small>
+              <small>{selectedCameraLabel}</small>
             </div>
-            <div className="live-platform-count">Session: {sessionId}</div>
+            <div className="live-platform-count">Source: {sourceLabel}</div>
           </div>
 
           <div className="live-frame live-platform-frame">
-            {streamUrl && !mjpegError ? (
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              autoPlay
+              style={{ display: activeSource === "browser" && running && !processedFrameSrc ? "block" : "none" }}
+            />
+            <canvas ref={canvasRef} style={{ display: "none" }} />
+            {activeSource === "backend" && backendStreamUrl && !mjpegError ? (
               <img
-                src={streamUrl}
-                alt="Live camera MJPEG stream"
+                src={backendStreamUrl}
+                alt="Local backend camera MJPEG stream"
                 onError={() => {
                   setMjpegError(true);
-                  setError("Stream terputus atau tidak dapat dibuka. Pastikan sesi masih berjalan lalu klik Reconnect.");
+                  setError("Local backend stream disconnected. Check whether the backend camera is still running.");
                 }}
               />
-            ) : mjpegError ? (
+            ) : activeSource === "backend" && mjpegError ? (
               <div className="empty-state live-empty-state">
-                <p style={{ color: "#ff6b6b", marginBottom: "12px" }}>Stream terputus.</p>
-                <button type="button" className="live-action-button secondary" onClick={openStream}>
+                <p style={{ color: "#ff6b6b", marginBottom: "12px" }}>Local backend stream disconnected.</p>
+                <button
+                  type="button"
+                  className="live-action-button secondary"
+                  onClick={() => {
+                    setMjpegError(false);
+                    setBackendStreamUrl(`${buildTurboMjpegUrl(sessionId)}&t=${Date.now()}`);
+                  }}
+                >
                   Reconnect Stream
                 </button>
               </div>
-            ) : running ? (
-              <div className="empty-state live-empty-state">
-                <p style={{ marginBottom: "12px" }}>Sesi aktif di backend.</p>
-                <button type="button" className="live-action-button secondary" onClick={openStream}>
-                  Sambungkan Stream
-                </button>
-              </div>
-            ) : (
+            ) : processedFrameSrc ? (
+              <img src={processedFrameSrc} alt="Redacted live camera frame" />
+            ) : !running ? (
               <div className="empty-state live-empty-state">
                 <Video size={46} />
                 <strong>Stream belum berjalan</strong>
-                <span>Pilih kamera dan tekan Start Live untuk membuka feed redaksi.</span>
+                <span>Pilih pipeline kamera dan tekan Start Live untuk mulai redaksi frame.</span>
+              </div>
+            ) : (
+              <div className="empty-state live-empty-state">
+                <RefreshCw className="spin" size={34} />
+                <strong>Menyiapkan frame redaksi</strong>
+                <span>Kamera sudah aktif, backend sedang memproses frame pertama.</span>
               </div>
             )}
           </div>
@@ -202,13 +573,13 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                   {isBusy ? "Starting..." : "Start Live"}
                 </button>
               ) : (
-                <button type="button" className="live-action-button stop" onClick={stopLiveCamera} disabled={isBusy}>
+                <button type="button" className="live-action-button stop" onClick={() => void stopLiveCamera()} disabled={isBusy}>
                   {isBusy ? <RefreshCw className="spin" size={18} /> : <Square size={16} />}
                   {isBusy ? "Stopping..." : "End Stream"}
                 </button>
               )}
-              <button type="button" className="live-action-button secondary" onClick={() => void refreshStatus()}>
-                <RefreshCw size={16} /> Status
+              <button type="button" className="live-action-button secondary" onClick={() => void refreshCameraDevices()}>
+                <RefreshCw size={16} /> Refresh Camera
               </button>
             </div>
 
@@ -217,16 +588,56 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                 <Settings2 size={16} /> Stream Settings
               </summary>
               <div className="live-settings-menu">
-                <Field label="Camera Source">
-                  <select value={cameraIndex} onChange={(event) => setCameraIndex(Number(event.target.value))}>
-                    {CAMERA_OPTIONS.map((camera) => (
-                      <option key={camera.index} value={camera.index}>
-                        {camera.label}
-                      </option>
-                    ))}
+                <Field label="Camera Pipeline">
+                  <select
+                    value={cameraPipeline}
+                    onChange={(event) => setCameraPipeline(event.target.value as CameraPipeline)}
+                    disabled={running}
+                  >
+                    <option value="browser">Browser Camera - recommended for deploy</option>
+                    <option value="backend">Local Backend Camera - local fallback only</option>
                   </select>
-                  <small className="field-hint">{selectedCamera.helper}</small>
+                  <small className="field-hint">
+                    Browser Camera works on HTTPS deploy. Local Backend Camera uses OpenCV on your laptop and is not for
+                    Azure container camera.
+                  </small>
                 </Field>
+
+                {cameraPipeline === "browser" ? (
+                  <Field label="Browser Camera Source">
+                    <select
+                      value={selectedDeviceId}
+                      onChange={(event) => setSelectedDeviceId(event.target.value)}
+                      disabled={running}
+                    >
+                      <option value="">Default Browser Camera</option>
+                      {cameraDevices.map((camera) => (
+                        <option key={camera.deviceId} value={camera.deviceId}>
+                          {camera.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="field-hint">
+                      Permission: {cameraPermissionState}. If labels are hidden, click Start Live and allow camera access.
+                    </small>
+                  </Field>
+                ) : (
+                  <Field label="Local Backend Camera Index">
+                    <select
+                      value={backendCameraIndex}
+                      onChange={(event) => setBackendCameraIndex(Number(event.target.value))}
+                      disabled={running}
+                    >
+                      {BACKEND_CAMERA_OPTIONS.map((camera) => (
+                        <option key={camera.index} value={camera.index}>
+                          {camera.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="field-hint">{selectedBackendCamera.helper}</small>
+                  </Field>
+                )}
+
                 <Field label={`Confidence (${confidenceThreshold})`}>
                   <input
                     type="range"
@@ -258,35 +669,37 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                   </Field>
                   <Field label="Infer Interval (ms)">
                     <NumericInput
-                      min={50}
+                      min={120}
                       max={2000}
                       value={inferIntervalMs}
-                      fallbackValue={90}
+                      fallbackValue={450}
                       onValueChange={setInferIntervalMs}
                     />
                   </Field>
                   <Field label="JPEG Quality">
                     <NumericInput min={35} max={95} value={jpegQuality} fallbackValue={75} onValueChange={setJpegQuality} />
                   </Field>
-                  <Field label="Box Hold (ms)">
-                    <NumericInput min={100} max={5000} value={boxHoldMs} fallbackValue={700} onValueChange={setBoxHoldMs} />
-                  </Field>
+                  {cameraPipeline === "backend" && (
+                    <Field label="Box Hold (ms)">
+                      <NumericInput min={100} max={5000} value={boxHoldMs} fallbackValue={700} onValueChange={setBoxHoldMs} />
+                    </Field>
+                  )}
                 </div>
               </div>
             </details>
           </div>
 
-          {(message || error) && (
-            <div className={`live-toast ${error ? "error" : "success"}`}>{error || message}</div>
-          )}
+          {(message || error) && <div className={`live-toast ${error ? "error" : "success"}`}>{error || message}</div>}
         </div>
 
         <aside className="live-side-panel">
           <div className="live-creator-card">
-            <div className="live-avatar"><Camera size={22} /></div>
+            <div className="live-avatar">
+              <Camera size={22} />
+            </div>
             <div>
-              <strong>{selectedCamera.label}</strong>
-              <span>{selectedCamera.helper}</span>
+              <strong>{selectedCameraLabel}</strong>
+              <span>{sourceLabel} camera pipeline</span>
             </div>
           </div>
 
@@ -314,8 +727,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
             <div>
               <strong>Ephemeral Processing</strong>
               <p>
-                Frame live diproses sementara, tidak disimpan ke storage dan tidak masuk vault. Cocok untuk demo
-                privacy filtering real-time.
+                Browser Camera is the deploy-safe mode. Local Backend Camera is only a local fallback when browser camera
+                permission is blocked during development.
               </p>
             </div>
           </div>
