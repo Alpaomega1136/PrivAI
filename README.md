@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img src="frontend/src/assets/PrivAI_logo.png" alt="PrivAI Logo" width="260" />
+  <img src="PrivAI_LOGO.png" alt="PrivAI Logo" width="260" />
 </p>
 
 <h1 align="center">PrivAI</h1>
@@ -29,23 +29,11 @@ PrivAI memproses gambar menggunakan YOLO lokal, menyimpan hasil redaksi di **Ope
 
 ## Repository About
 
-**Description**
-
-```text
-Government-first visual privacy firewall for detecting, redacting, and securely governing sensitive identity data with local YOLO inference, Sovereign Vault encryption, Dynamic Injection policy, and audit logs.
-```
-
-**Website**
-
-```text
-https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io
-```
-
-**Topics**
-
-```text
-privai, privacy, fastapi, react, yolo, computer-vision, redaction, smart-governance, sovereign-vault, audit-log, azure-container-apps
-```
+| Field | Value |
+|---|---|
+| Description | Government-first visual privacy firewall for detecting, redacting, and securely governing sensitive identity data with local YOLO inference, Sovereign Vault encryption, Dynamic Injection policy, and audit logs. |
+| Website | https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io |
+| Topics | `privai`, `privacy`, `fastapi`, `react`, `yolo`, `computer-vision`, `redaction`, `smart-governance`, `sovereign-vault`, `audit-log`, `azure-container-apps` |
 
 ## Demo Online
 
