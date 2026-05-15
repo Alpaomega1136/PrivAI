@@ -1,63 +1,143 @@
-# PrivAI - Government-First Visual Privacy Firewall
+# PrivAI
 
-PrivAI adalah aplikasi privacy firewall visual berbasis AI untuk mendeteksi dan meredaksi data identitas sensitif pada gambar dokumen dan kamera. Sistem ini dirancang untuk skenario Smart Governance/Public Service: data sensitif diproses secara lokal, hasil redaksi disimpan di Operational Zone, dan file original disimpan terenkripsi di Sovereign Vault.
+PrivAI adalah aplikasi **government-first visual privacy firewall** untuk mendeteksi dan meredaksi data identitas sensitif pada dokumen dan live camera feed. Aplikasi ini dibuat untuk skenario Smart Governance/Public Service: data diproses oleh backend sendiri, hasil redaksi masuk Operational Zone, original disimpan terenkripsi di Sovereign Vault, dan akses original dikontrol lewat Government Access API.
 
-Project ini berjalan lokal tanpa cloud API, tanpa retraining model, dan tanpa mengirim dokumen pengguna ke layanan eksternal.
+PrivAI tidak melakukan retraining model saat runtime, tidak memakai MySQL/MinIO untuk MVP, dan tidak memanggil external cloud AI API untuk proses deteksi. Deployment cloud hanya dipakai sebagai hosting aplikasi.
 
-## Ringkasan Fitur
+## Status Online
 
-| Area | Fitur | Keterangan |
-|---|---|---|
-| User Zone | Redaksi dokumen | Upload gambar, jalankan YOLO lokal, redaksi visual, lihat hasil redacted. |
-| AI Detection | Local YOLO inference | Model `.pt` lokal dari `backend/models`. Tidak ada retraining. |
-| AI Guardrail | False-positive/authenticity guardrail | Post-processing untuk membedakan dokumen resmi vs gambar tangan/sketsa/palsu. |
-| Operational Zone | Redacted storage | Menyimpan hanya file redacted dan metadata non-private. Original tidak disimpan plaintext. |
-| Sovereign Vault | Encrypted original storage | Original dienkripsi dengan AES-256-GCM dan DEK dibungkus RSA-OAEP-SHA256. |
-| Government Access | Controlled original access | Request, approval, one-time token, secure download original, token hanya sekali pakai. |
-| Dynamic Policy | Runtime policy | Ubah confidence, mode redaksi, class aktif, dan label tanpa restart backend. |
-| Audit Log | Security trace | Mencatat event penting seperti vault encryption, access approval, guardrail reject, dan runtime policy. |
-| Live Camera | Secondary track | Backend camera MJPEG stream dengan redaksi ephemeral. Frame tidak disimpan. |
+Aplikasi sudah berjalan online di Azure Container Apps.
+
+| Komponen | URL |
+|---|---|
+| Frontend | `https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io` |
+| Backend | `https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io` |
+| Backend health | `https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health` |
+| Backend docs | `https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/docs` |
+| Frontend proxied health | `https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health` |
+
+Deployment saat ini:
+
+| Resource | Nilai |
+|---|---|
+| Resource group | `rg-privai-demo` |
+| Container Apps environment | `env-privai-demo` |
+| ACR | `acrprivairaymond2026.azurecr.io` |
+| Backend image | `acrprivairaymond2026.azurecr.io/privai-backend:latest` |
+| Frontend image | `acrprivairaymond2026.azurecr.io/privai-frontend:latest` |
+| Backend Container App | `privai-backend` |
+| Frontend Container App | `privai-frontend` |
+
+Catatan: Azure Static Web Apps tidak dipakai karena policy subscription memblokir region yang tersedia untuk resource type tersebut. Frontend dideploy sebagai container nginx di Azure Container Apps.
+
+## Fitur Utama
+
+| Area | Fungsi |
+|---|---|
+| User Zone | Upload dokumen, drag and drop, pilih performance mode, jalankan deteksi dan redaksi. |
+| AI Detection | YOLO `.pt` lokal melalui Ultralytics. Model tidak diretrain saat runtime. |
+| Performance Mode | `fast`, `balanced`, `robust` untuk memilih tradeoff kecepatan vs verifikasi. |
+| Per-Class Confidence | Threshold dapat berbeda per class seperti `Wajah`, `NIK_Teks`, `KTP`, `SIM`, `Paspor`, `Plat_Nomor`. |
+| Authenticity Guardrail | Layer post-processing untuk mengurangi false positive dari gambar tangan/sketsa dokumen. |
+| Operational Zone | Menyimpan output redacted dan metadata non-private. Tidak menyimpan original plaintext. |
+| Sovereign Vault | Menyimpan original sebagai encrypted bundle AES-256-GCM dengan DEK dibungkus RSA-OAEP-SHA256. |
+| Key Rotation | Rotasi key vault untuk upload baru, key lama tetap dipertahankan untuk record lama. |
+| Government Access | Request, approval, one-time token, secure original download, token sekali pakai. |
+| Dynamic Injection | Runtime policy tervalidasi untuk profile, mode redaksi, active class, disabled class, threshold, dan label. |
+| Audit Log | Jejak event keamanan untuk redaksi, vault, policy, government access, dan key rotation. |
+| Live Stream Track | Secondary track untuk redaksi frame/live camera secara ephemeral. |
 
 ## Class Deteksi
 
-Class canonical yang dipakai sistem:
+Class canonical yang digunakan:
 
-| Class | Deskripsi |
+| Class | Keterangan |
 |---|---|
 | `KTP` | Kartu Tanda Penduduk. |
 | `SIM` | Surat Izin Mengemudi. |
-| `Paspor` | Dokumen paspor. |
-| `NIK_Teks` | Teks/nomor identitas NIK. |
-| `Wajah` | Wajah pada dokumen atau kamera. |
+| `Paspor` | Paspor. |
+| `NIK_Teks` | Nomor identitas atau teks NIK. |
+| `Wajah` | Wajah pada dokumen atau frame kamera. |
 | `Plat_Nomor` | Plat nomor kendaraan. |
 
-## Arsitektur Keamanan
+Default confidence per class berada di `backend/app/core/config.py`.
+
+```python
+DEFAULT_CLASS_CONFIDENCE = {
+    "KTP": 0.35,
+    "SIM": 0.35,
+    "Paspor": 0.35,
+    "NIK_Teks": 0.30,
+    "Wajah": 0.25,
+    "Plat_Nomor": 0.35,
+}
+```
+
+## Arsitektur Alur Data
 
 ```text
 User Zone
-  -> Local YOLO inference
-  -> False-positive/authenticity guardrail
-  -> Visual redaction
-  -> Operational Zone: redacted image + non-private metadata
-  -> Sovereign Vault: encrypted original bundle
-  -> Government Access API: controlled original decryption
-  -> Audit Log: security event trail
+  -> local YOLO inference
+  -> performance preset / TTA if enabled
+  -> authenticity and false-positive guardrail
+  -> visual redaction
+  -> Operational Zone stores redacted output + non-private metadata
+  -> Sovereign Vault stores encrypted original bundle
+  -> Government Access API controls original download
+  -> Audit Log records security events
 ```
 
-Prinsip utama:
+Prinsip keamanan:
 
 - Original image tidak disimpan plaintext di Operational Zone.
-- Original image hanya masuk Sovereign Vault dalam bentuk encrypted bundle.
-- Private key vault tidak dikirim ke frontend/user zone.
-- One-time access token tidak disimpan plaintext di database.
-- Runtime policy divalidasi sebagai konfigurasi, bukan kode yang dieksekusi.
+- Original image hanya disimpan dalam encrypted bundle di Sovereign Vault.
+- Private key tidak pernah dikirim ke frontend.
+- One-time token government access tidak disimpan plaintext di database.
+- Runtime policy hanya konfigurasi tervalidasi, bukan kode yang dieksekusi.
 - Guardrail adalah post-processing, bukan retraining model.
 
-## Teknologi
+## Struktur Folder
 
-### Backend
+```text
+PrivAI/
+  backend/
+    app/
+      ai/                  # YOLO detector, runtime loader, class map
+      api/                 # FastAPI routers
+      core/                # config, redaction policy, runtime policy
+      db/                  # SQLAlchemy database, models, repositories
+      services/            # redaction, vault, access, audit, guardrail, live stream
+      utils/               # image, file, hash, time utilities
+    models/                # YOLO .pt model
+    storage/               # SQLite DB, redacted output, vault bundle, keys, policy
+    datasets/hard_negatives/ # validation/benchmark only, not training
+    requirements.txt
+    Dockerfile
+    .env.example
+  frontend/
+    src/
+      components/
+      layouts/
+      lib/api.ts           # API client
+      views/               # User and Government pages
+      styles.css
+    assets/
+    Dockerfile
+    nginx.conf
+    vite.config.ts
+    package.json
+  doc/
+  research/
+  scripts/
+  docker-compose.yml
+  README.md
+```
 
-- Python 3.11+
+## Tech Stack
+
+Backend:
+
+- Python 3.11
 - FastAPI
 - Uvicorn
 - SQLAlchemy
@@ -69,56 +149,22 @@ Prinsip utama:
 - cryptography
 - pydantic / pydantic-settings
 - python-dotenv
-- easyocr optional untuk OCR guardrail/authenticity check
+- EasyOCR for OCR-capable guardrail validation
 
-### Frontend
+Frontend:
 
 - React
 - TypeScript
 - Vite
 - Lucide React
-- Vite HTTPS dev server dengan `@vitejs/plugin-basic-ssl`
+- CSS custom styling
+- nginx for production container serving
 
-### Storage Lokal
+Deployment:
 
-- Database: `backend/storage/privai.db`
-- Redacted files: `backend/storage/operational_zone/redacted/`
-- Operational metadata: `backend/storage/operational_zone/metadata/`
-- Encrypted original: `backend/storage/sovereign_vault/encrypted_original/`
-- Simulated vault keys: `backend/storage/sovereign_vault/keys_simulated/`
-- Runtime policy: `backend/storage/config/runtime_policy.json`
-
-## Struktur Folder Penting
-
-```text
-PrivAI/
-  backend/
-    app/
-      ai/                  # YOLO runtime, detector, class map
-      api/                 # FastAPI routers
-      core/                # config, redaction policy, runtime policy
-      db/                  # SQLAlchemy models and repositories
-      services/            # redaction, vault, access, audit, guardrail, live
-      utils/               # image, file, hash, time utilities
-    certs/                 # local HTTPS certs, pem ignored by git
-    datasets/hard_negatives/ # validation set only, not for training
-    models/                # local YOLO .pt model files
-    storage/               # runtime data, database, vault, redacted output
-    requirements.txt
-    .env.example
-  frontend/
-    src/
-      App.tsx              # main SPA views
-      lib/api.ts           # API client
-      styles.css
-      multi-select.css
-    .env.development       # Vite proxy target
-    vite.config.ts
-    package.json
-  doc/
-  SPECIFICATION.md
-  README.md
-```
+- Azure Container Apps
+- Azure Container Registry
+- Docker
 
 ## Model YOLO
 
@@ -128,58 +174,29 @@ Default expected model path:
 backend/models/privai_epoch50.pt
 ```
 
-Fallback yang didukung oleh backend saat ini:
+Fallback yang didukung backend:
 
 ```text
 backend/models/model_deteksi.pt
 ```
 
-Jika model tidak ada, backend tetap bisa hidup, tetapi `/api/redact` dan live inference akan mengembalikan error karena model belum loaded.
+Jika model belum tersedia, backend tetap bisa hidup. Endpoint `/api/health` dan `/api/model-info` akan menunjukkan `model_loaded=false` atau `model_loading=true`, sedangkan endpoint yang butuh inference akan mengembalikan error service unavailable sampai model siap.
 
 Cek status model:
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/model-info
+curl.exe http://127.0.0.1:8000/api/model-info
 ```
 
-## HTTPS Lokal
-
-Project saat ini diset agar frontend dan backend sama-sama berjalan via HTTPS.
-
-Backend HTTPS:
-
-```text
-https://127.0.0.1:8000
-```
-
-Frontend HTTPS:
-
-```text
-https://localhost:5173
-```
-
-Sertifikat lokal berada di:
-
-```text
-backend/certs/localhost-cert.pem
-backend/certs/localhost-key.pem
-```
-
-File `.pem` di-ignore oleh git. Jika sertifikat belum ada, generate dengan:
+Untuk online:
 
 ```powershell
-cd D:\PrivAI\backend
-openssl req -x509 -newkey rsa:2048 -nodes `
-  -keyout certs\localhost-key.pem `
-  -out certs\localhost-cert.pem `
-  -days 365 `
-  -subj "/CN=localhost" `
-  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+curl.exe https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/model-info
 ```
 
-Karena sertifikat self-signed, browser akan menampilkan peringatan keamanan. Untuk development lokal, lanjutkan melalui pilihan Advanced/Proceed.
+## Menjalankan Lokal
 
-## Menjalankan Backend
+### Backend Lokal
 
 ```powershell
 cd D:\PrivAI\backend
@@ -187,26 +204,25 @@ cd D:\PrivAI\backend
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+copy .env.example .env
 
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 `
-  --ssl-keyfile .\certs\localhost-key.pem `
-  --ssl-certfile .\certs\localhost-cert.pem
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Cek backend:
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/health
-curl.exe -k https://127.0.0.1:8000/api/model-info
+curl.exe http://127.0.0.1:8000/api/health
+curl.exe http://127.0.0.1:8000/api/model-info
 ```
 
-Swagger docs:
+Swagger docs lokal:
 
 ```text
-https://127.0.0.1:8000/docs
+http://127.0.0.1:8000/docs
 ```
 
-## Menjalankan Frontend
+### Frontend Lokal
 
 ```powershell
 cd D:\PrivAI\frontend
@@ -217,12 +233,10 @@ npm run dev
 Buka:
 
 ```text
-https://localhost:5173
+http://localhost:5173
 ```
 
-Frontend memakai proxy Vite untuk `/api/*`.
-
-File konfigurasi:
+Frontend development memakai Vite proxy. File konfigurasi:
 
 ```text
 frontend/.env.development
@@ -231,20 +245,37 @@ frontend/.env.development
 Isi saat ini:
 
 ```env
-VITE_API_PROXY_TARGET=https://127.0.0.1:8000
+VITE_API_PROXY_TARGET=http://127.0.0.1:8000
 ```
 
-Jika mengubah `.env.development`, restart `npm run dev` karena Vite hanya membaca env saat startup.
+Jika `.env.development` diubah, restart `npm run dev`.
+
+## Menjalankan Dengan Docker Compose Lokal
+
+```powershell
+cd D:\PrivAI
+docker compose up --build
+```
+
+Default local docker URL:
+
+```text
+Frontend: http://localhost:5173
+Backend:  http://localhost:8000
+Docs:     http://localhost:8000/docs
+```
+
+Catatan penting untuk Docker Compose lokal: jika `frontend/.env.production` berisi backend Azure, build production frontend akan mengarah ke backend Azure. Untuk full local Docker Compose, kosongkan atau sesuaikan `VITE_API_BASE_URL` sebelum build image frontend.
 
 ## Environment Backend
 
-Contoh konfigurasi ada di:
+Contoh env ada di:
 
 ```text
 backend/.env.example
 ```
 
-Contoh minimal:
+Isi penting:
 
 ```env
 APP_NAME=PrivAI
@@ -263,102 +294,132 @@ CRYPTO_ADMIN_TOKEN=privai-crypto-admin-demo-token
 
 RUNTIME_POLICY_PATH=./storage/config/runtime_policy.json
 
-CORS_ORIGINS=https://localhost:5173,https://127.0.0.1:5173
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-Jika membuat file `backend/.env`, pastikan CORS memakai `https://`, bukan `http://`.
+Untuk online Azure, backend CORS sudah ditambahkan agar menerima frontend:
+
+```text
+https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io
+```
+
+## Environment Frontend
+
+Development:
+
+```text
+frontend/.env.development
+```
+
+```env
+VITE_API_PROXY_TARGET=http://127.0.0.1:8000
+```
+
+Production build untuk Azure:
+
+```text
+frontend/.env.production
+```
+
+```env
+VITE_API_BASE_URL=https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io
+```
+
+Frontend production juga memiliki fallback proxy di nginx untuk `/api`, `/docs`, dan `/openapi.json` ke backend Azure.
 
 ## Endpoint Utama
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | GET | `/api/health` | Status backend, model, storage, database. |
-| GET | `/api/model-info` | Info path model, loaded status, class list. |
-| GET | `/api/redaction-config` | Profile, mode, dan class redaction. |
-| POST | `/api/redact` | Upload gambar dan jalankan pipeline redaksi government. |
-| GET | `/api/files/redacted/{filename}` | Ambil hasil redacted image. |
-| GET | `/api/storage/records` | Daftar Operational Zone records. |
+| GET | `/api/model-info` | Info model, path efektif, status loaded/loading, class list. |
+| GET | `/api/redaction-config` | Profile, redaction mode, dan class canonical. |
+| POST | `/api/redact` | Upload gambar dan jalankan pipeline redaksi. |
+| GET | `/api/files/redacted/{filename}` | Ambil hasil gambar redacted. |
+| GET | `/api/storage/records` | Operational Zone registry. |
 | GET | `/api/crypto/key-info` | Info active vault key tanpa private key. |
-| POST | `/api/crypto/rotate-vault-key` | Rotasi RSA vault key. |
+| POST | `/api/crypto/rotate-vault-key` | Rotasi key vault. |
 | GET | `/api/vault/records/{record_id}` | Metadata encrypted original, tanpa plaintext. |
-| GET | `/api/runtime-policy` | Lihat Dynamic Policy. |
-| PUT | `/api/runtime-policy` | Update Dynamic Policy. |
-| POST | `/api/runtime-policy/reset` | Reset Dynamic Policy. |
+| GET | `/api/runtime-policy` | Lihat runtime policy Dynamic Injection. |
+| PUT | `/api/runtime-policy` | Update runtime policy. |
+| POST | `/api/runtime-policy/reset` | Reset runtime policy default. |
 | POST | `/api/government/access-requests` | Buat request akses original. |
 | POST | `/api/government/access-requests/{request_id}/approve` | Approve request dan issue one-time token. |
-| GET | `/api/government/access-requests/{request_id}` | Cek status request. |
+| GET | `/api/government/access-requests/{request_id}` | Cek status request akses. |
 | GET | `/api/government/access-requests/{request_id}/secure-original` | Download original dengan one-time token. |
 | GET | `/api/audit-logs` | Daftar audit log. |
 | POST | `/api/live/redact-frame` | Redaksi satu frame ephemeral. |
-| POST | `/api/live/turbo/start` | Start backend camera MJPEG stream. |
-| POST | `/api/live/turbo/stop` | Stop live stream. |
-| GET | `/api/live/turbo/status` | Status live stream. |
-| GET | `/api/live/turbo/mjpeg` | Stream MJPEG redacted output. |
+| POST | `/api/live/turbo/start` | Start backend live camera session. |
+| POST | `/api/live/turbo/stop` | Stop live camera session. |
+| GET | `/api/live/turbo/status` | Status live camera session. |
+| GET | `/api/live/turbo/mjpeg` | Stream MJPEG hasil redaksi. |
 
 ## Redaction Pipeline
 
-Urutan `/api/redact`:
+Endpoint utama:
 
 ```text
-1. Validate upload image
+POST /api/redact
+```
+
+Pipeline:
+
+```text
+1. Validate image upload
 2. Decode image with OpenCV
-3. Resolve runtime/manual policy
-4. YOLO local inference
-5. Optional document TTA for government upload
-6. False-positive/authenticity guardrail
-7. Redact only validated detections
-8. Save redacted image to Operational Zone
-9. Save original encrypted bundle to Sovereign Vault
-10. Save database metadata
-11. Write audit logs
-12. Return redaction response
+3. Resolve manual policy or Dynamic Injection runtime policy
+4. Apply Performance Mode settings
+5. Run YOLO inference
+6. Optional document rotation TTA
+7. Apply authenticity / false-positive guardrail
+8. Redact validated detections
+9. Save redacted output to Operational Zone
+10. Encrypt original into Sovereign Vault
+11. Save SQLite metadata
+12. Write audit logs
+13. Return response to frontend
 ```
 
-Response penting:
+Query parameter penting:
 
-```json
-{
-  "record_id": "rec_...",
-  "validation_summary": {},
-  "detections": [],
-  "redacted_detections": [],
-  "skipped_detections": [],
-  "rejected_detections": [],
-  "operational_zone": {},
-  "sovereign_vault": {}
-}
-```
+| Parameter | Default | Keterangan |
+|---|---|---|
+| `profile` | `government` | Redaction profile. |
+| `performance_mode` | `fast` | `fast`, `balanced`, atau `robust`. |
+| `confidence_threshold` | `0.35` | Fallback confidence global. |
+| `redaction_mode` | profile default | `black_box`, `blur`, atau `pixelate`. |
+| `active_classes` | profile default | CSV class yang aktif. |
+| `disabled_classes` | empty | CSV class yang dimatikan. |
+| `use_runtime_policy` | `false` | Pakai Dynamic Injection policy. |
+| `document_tta` | `true` | Rotation TTA untuk dokumen. Effective value bisa di-override performance mode. |
+| `tta_angles` | mode dependent | Contoh `0,180` atau `0,90,180,270`. |
+| `guardrail_enabled` | `true` | Aktifkan false-positive guardrail. |
+| `guardrail_mode` | mode dependent | `precision_demo`, `privacy_first`, atau `off`. |
+| `authenticity_ocr` | `false` | OCR guardrail, terutama untuk robust validation. |
 
-## False-Positive / Authenticity Guardrail
+## Performance Mode
 
-Guardrail adalah layer post-processing setelah YOLO, sebelum redaction. Tujuannya membedakan dokumen resmi dari gambar tangan/sketsa/palsu di atas kertas.
+| Mode | Perilaku | Cocok Untuk |
+|---|---|---|
+| `fast` | 1x inference, no TTA, no OCR, guardrail ringan. | Demo cepat. |
+| `balanced` | TTA `0,180`, no OCR default. | Dokumen normal dan upside-down. |
+| `robust` | TTA lebih lengkap, OCR-capable guardrail. | Verifikasi dokumen sulit. |
 
-Guardrail tidak melakukan retraining, tidak mengganti model, dan tidak memakai cloud API.
+Response `/api/redact` memiliki `timing` breakdown seperti `total_ms`, `inference_ms`, `guardrail_ms`, `redaction_ms`, `storage_ms`, dan `vault_ms` untuk melihat bottleneck.
 
-Class group:
+## Authenticity Guardrail
 
-| Group | Class |
-|---|---|
-| Official documents | `KTP`, `SIM`, `Paspor` |
-| Sensitive text | `NIK_Teks` |
-| Face | `Wajah` |
-
-Query parameter:
-
-```text
-guardrail_enabled=true
-guardrail_mode=precision_demo
-```
+Guardrail dipakai setelah YOLO dan sebelum redaction untuk mengurangi false positive dari gambar tangan atau sketsa di atas kertas.
 
 Mode:
 
 | Mode | Perilaku |
 |---|---|
-| `precision_demo` | Detection suspicious/rejected tidak ikut diredaksi dan masuk `rejected_detections`. Default government upload. |
-| `privacy_first` | Detection suspicious tetap diredaksi, tetapi diberi status warning. |
-| `off` | Guardrail dimatikan, perilaku lama. |
+| `precision_demo` | Detection suspicious dapat masuk `rejected_detections` dan tidak diredaksi sebagai dokumen resmi. |
+| `privacy_first` | Detection suspicious tetap diredaksi, tetapi diberi status validasi. |
+| `off` | Guardrail dimatikan. |
 
-Field tambahan per detection:
+Field tambahan detection:
 
 ```json
 {
@@ -369,48 +430,110 @@ Field tambahan per detection:
 }
 ```
 
-Hard-negative validation set:
+Hard-negative validation set dapat diletakkan di:
 
 ```text
 backend/datasets/hard_negatives/
 ```
 
-Folder ini untuk benchmark false positive, bukan training.
+Folder tersebut untuk benchmark dan kalibrasi guardrail, bukan training.
 
-## Dynamic Policy
+## Dynamic Injection
 
-Runtime policy disimpan di:
+Dynamic Injection di PrivAI adalah runtime policy yang tervalidasi. Tidak ada `eval` dan tidak ada eksekusi kode arbitrer.
+
+File policy runtime:
 
 ```text
 backend/storage/config/runtime_policy.json
 ```
 
-Contoh field:
+Field utama:
 
 ```json
 {
   "policy_name": "Default Government Policy",
   "confidence_threshold": 0.35,
+  "class_confidence_threshold": {
+    "KTP": 0.35,
+    "SIM": 0.35,
+    "Paspor": 0.35,
+    "NIK_Teks": 0.30,
+    "Wajah": 0.25,
+    "Plat_Nomor": 0.35
+  },
   "profile": "government",
   "redaction_mode": "black_box",
   "active_classes": ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"],
   "disabled_classes": [],
   "label_text": "REDACTED",
-  "updated_at": "2026-05-14T18:23:59+07:00"
+  "injection_note": "Default policy"
 }
 ```
 
-Dynamic Policy adalah konfigurasi tervalidasi. Tidak ada `eval` dan tidak ada eksekusi kode dinamis.
+Frontend menyediakan UI untuk memilih class aktif, class disabled, mode redaksi, threshold, dan reset policy.
+
+## Operational Zone
+
+Operational Zone menyimpan:
+
+```text
+backend/storage/operational_zone/redacted/
+backend/storage/operational_zone/metadata/
+```
+
+Yang disimpan:
+
+- gambar hasil redaksi
+- metadata proses non-private
+- URL preview redacted output
+
+Yang tidak boleh disimpan:
+
+- original plaintext
+- private key
+- raw one-time token
+
+## Sovereign Vault
+
+Sovereign Vault menyimpan encrypted original bundle di:
+
+```text
+backend/storage/sovereign_vault/encrypted_original/
+```
+
+Key simulasi disimpan di:
+
+```text
+backend/storage/sovereign_vault/keys_simulated/
+```
+
+Skema:
+
+```text
+Original bytes
+  -> random DEK per upload
+  -> AES-256-GCM encrypt original
+  -> RSA-OAEP-SHA256 wrap DEK
+  -> store encrypted JSON bundle
+```
+
+Key rotation:
+
+- membuat key version baru
+- key baru dipakai untuk upload berikutnya
+- key lama tetap disimpan agar record lama masih bisa didekripsi lewat flow resmi
+- private key tidak dikirim ke frontend
 
 ## Government Access Flow
 
-1. Upload dokumen melalui `/api/redact` dan ambil `record_id`.
-2. Buat access request dengan government token.
-3. Approver menyetujui request dengan approver token.
-4. Backend mengembalikan one-time token sekali saja.
+1. Upload dokumen dan ambil `record_id`.
+2. Buat access request dengan `GOVERNMENT_TOKEN`.
+3. Approver menyetujui dengan `APPROVER_TOKEN`.
+4. Backend mengembalikan one-time access token sekali saja.
 5. Gunakan token untuk secure original download.
-6. Token ditandai `used` dan tidak bisa dipakai ulang.
-7. Semua event dicatat ke audit log.
+6. Token ditandai `used` dan tidak bisa digunakan ulang.
+7. Audit log mencatat request, approval, dan authorized decryption.
 
 Demo token default:
 
@@ -420,155 +543,191 @@ APPROVER_TOKEN=privai-approver-demo-token
 CRYPTO_ADMIN_TOKEN=privai-crypto-admin-demo-token
 ```
 
-## Live Camera Track
+## Live Stream Track
 
-Live camera adalah secondary track dan bersifat ephemeral.
+Live Stream adalah secondary track.
 
-- Backend membuka kamera lokal berdasarkan `camera_index`.
-- Output MJPEG ditampilkan di frontend.
-- Frame tidak disimpan ke Operational Zone.
-- Frame tidak masuk Sovereign Vault.
-- Default active class live adalah `Wajah`, tetapi UI dapat memilih class lain untuk demo.
-
-Endpoint utama:
+Endpoint:
 
 ```text
+POST /api/live/redact-frame
 POST /api/live/turbo/start
 POST /api/live/turbo/stop
 GET  /api/live/turbo/status
 GET  /api/live/turbo/mjpeg
 ```
 
-## Waktu dan Timezone
+Catatan deployment online: backend Azure berjalan di cloud, sehingga tidak bisa memakai webcam laptop lokal melalui `camera_index`. Fitur backend camera lebih cocok untuk demo lokal. Untuk online, gunakan upload/document flow atau frame-based endpoint jika frontend mengirim frame dari browser.
 
-Backend mengirim timestamp dalam WIB (`Asia/Jakarta`, UTC+07:00). Contoh:
+## Audit Log
+
+Audit log mencatat event seperti:
+
+- `vault_key_initialized`
+- `vault_key_rotated`
+- `redacted_output_created`
+- `encrypted_original_stored`
+- `runtime_policy_updated`
+- `runtime_policy_reset`
+- `runtime_policy_applied`
+- `access_request_created`
+- `access_request_approved`
+- `authorized_original_decryption`
+- `false_positive_guardrail_applied`
+- `performance_mode_applied`
+
+Endpoint:
 
 ```text
-2026-05-14T18:23:59+07:00
+GET /api/audit-logs?limit=50
 ```
 
-Frontend juga memformat tanggal dengan timezone `Asia/Jakarta` dan menampilkan label `WIB`.
+Filter yang didukung:
+
+```text
+record_id
+zone
+event_type
+limit
+```
+
+## Waktu dan Timezone
+
+Backend menggunakan utilitas waktu WIB (`Asia/Jakarta`, UTC+07:00). Frontend juga menampilkan tanggal dengan label WIB.
 
 ## Contoh Test Manual
 
-Health:
+Health online:
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/health
+curl.exe https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health
+curl.exe https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health
 ```
 
-Model info:
+Health lokal:
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/model-info
+curl.exe http://127.0.0.1:8000/api/health
 ```
 
-Redact image:
+Upload redaction lokal:
 
 ```powershell
-curl.exe -k -X POST "https://127.0.0.1:8000/api/redact?profile=government&guardrail_mode=precision_demo" `
-  -F "file=@D:\Lomba\sample\test.jpg"
+curl.exe -X POST "http://127.0.0.1:8000/api/redact?profile=government&performance_mode=fast" `
+  -F "file=@D:\PrivAI\sample\test.jpg"
 ```
 
 Runtime policy:
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/runtime-policy
+curl.exe http://127.0.0.1:8000/api/runtime-policy
 ```
 
 Audit logs:
 
 ```powershell
-curl.exe -k "https://127.0.0.1:8000/api/audit-logs?limit=20"
+curl.exe "http://127.0.0.1:8000/api/audit-logs?limit=20"
 ```
 
-## Testing Guardrail
+## Azure Redeploy Commands
 
-Gunakan dua tipe gambar:
+Login ACR:
 
-| Test | Ekspektasi |
-|---|---|
-| Dokumen asli/realistic | Tetap diredaksi, `validation_status` umumnya `valid_document` atau `uncertain_document_kept`. |
-| Gambar tangan KTP/SIM/Paspor di kertas | Dalam `precision_demo`, masuk `rejected_detections` dan tidak ikut redaction. |
-| Tulisan NIK 16 digit | Jika OCR tersedia dan pola valid terbaca, tetap diredaksi sebagai sensitive text. |
-| Catatan random/pensil tanpa pola identitas | Harus cenderung rejected/skipped, bukan dianggap dokumen resmi. |
+```powershell
+az acr login --name acrprivairaymond2026
+```
 
-Cek response:
+Build dan push frontend:
 
-```text
-validation_summary
-rejected_detections
-detections[].validation_status
-detections[].guardrail_action
+```powershell
+cd D:\PrivAI\frontend
+
+docker build -t acrprivairaymond2026.azurecr.io/privai-frontend:latest .
+docker push acrprivairaymond2026.azurecr.io/privai-frontend:latest
+
+$suffix = "fe" + (Get-Date -Format "HHmmss")
+az containerapp update `
+  --name privai-frontend `
+  --resource-group rg-privai-demo `
+  --image acrprivairaymond2026.azurecr.io/privai-frontend:latest `
+  --revision-suffix $suffix
+```
+
+Build dan push backend:
+
+```powershell
+cd D:\PrivAI\backend
+
+docker build -t acrprivairaymond2026.azurecr.io/privai-backend:latest .
+docker push acrprivairaymond2026.azurecr.io/privai-backend:latest
+
+$suffix = "be" + (Get-Date -Format "HHmmss")
+az containerapp update `
+  --name privai-backend `
+  --resource-group rg-privai-demo `
+  --image acrprivairaymond2026.azurecr.io/privai-backend:latest `
+  --revision-suffix $suffix
+```
+
+Update CORS backend jika URL frontend berubah:
+
+```powershell
+az containerapp update `
+  --name privai-backend `
+  --resource-group rg-privai-demo `
+  --set-env-vars CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io"
 ```
 
 ## Troubleshooting
 
-### Frontend masih proxy ke 8010
+### Frontend online terbuka tapi API gagal
 
-Pastikan:
-
-```text
-frontend/.env.development
-```
-
-berisi:
-
-```env
-VITE_API_PROXY_TARGET=https://127.0.0.1:8000
-```
-
-Lalu restart Vite:
+Cek health lewat frontend origin:
 
 ```powershell
-cd D:\PrivAI\frontend
-Ctrl + C
-npm run dev
+curl.exe https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health
 ```
 
-### Browser menolak sertifikat
-
-Buka backend docs sekali:
-
-```text
-https://127.0.0.1:8000/docs
-```
-
-Lalu accept self-signed certificate di browser.
-
-### Backend HTTPS tidak hidup
-
-Pastikan menjalankan uvicorn dengan SSL:
+Jika error nginx, cek log frontend:
 
 ```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 `
-  --ssl-keyfile .\certs\localhost-key.pem `
-  --ssl-certfile .\certs\localhost-cert.pem
+az containerapp logs show `
+  --name privai-frontend `
+  --resource-group rg-privai-demo `
+  --tail 80
 ```
 
-### Model tidak loaded
-
-Cek file model:
-
-```text
-backend/models/privai_epoch50.pt
-backend/models/model_deteksi.pt
-```
-
-Cek API:
+### Backend online tidak respons
 
 ```powershell
-curl.exe -k https://127.0.0.1:8000/api/model-info
+az containerapp logs show `
+  --name privai-backend `
+  --resource-group rg-privai-demo `
+  --tail 120
 ```
 
-### Timestamp bukan WIB
+### CORS error di browser
 
-Restart backend setelah update. Response API baru harus mengandung `+07:00`.
+Pastikan backend env `CORS_ORIGINS` mengandung URL frontend yang dipakai browser.
 
-## Catatan Development
+### Model belum loaded
 
-- Jangan commit file model `.pt` jika ukurannya besar atau sensitif.
-- Jangan commit `backend/storage/` karena berisi data runtime.
-- Jangan commit private key/cert `.pem` di `backend/certs/`.
-- Guardrail dapat dituning lewat threshold di `backend/app/services/false_positive_guardrail.py` tanpa retraining.
-- Untuk hackathon demo, gunakan `guardrail_mode=precision_demo` pada upload dokumen government.
+Cek:
+
+```powershell
+curl.exe https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/model-info
+```
+
+Jika `model_loading=true`, tunggu beberapa saat. Jika `load_error` muncul, cek model path dan log backend.
+
+### Data hilang setelah redeploy cloud
+
+MVP memakai SQLite dan local filesystem storage. Untuk production yang perlu durable storage, gunakan persistent volume seperti Azure Files atau database managed. Untuk hackathon demo, storage lokal container cukup selama lifecycle demo, tetapi tidak boleh dianggap sebagai production retention.
+
+## Catatan Keamanan MVP
+
+- Ini adalah MVP hackathon, bukan sistem production-ready untuk dokumen negara sungguhan.
+- Private key disimpan dalam local simulated vault. Production harus memakai HSM/KMS non-exportable.
+- Token demo default harus diganti jika dipakai di environment publik.
+- SQLite/local filesystem cukup untuk demo, tetapi production perlu storage dan database yang durable serta access control yang lebih ketat.
+- Dataset hard-negative dipakai untuk validasi false positive, bukan retraining.
