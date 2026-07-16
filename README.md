@@ -315,7 +315,7 @@ Live Stream punya dua pipeline:
 
 | Pipeline | Dipakai Untuk | Catatan |
 |---|---|---|
-| Browser Camera | Local dan deploy online. | Kamera dibuka oleh browser user. Gunakan `http://localhost:5173` saat lokal atau HTTPS saat deploy. |
+| Browser Camera | Local dan deploy online. | Kamera dibuka browser, deteksi dikirim lewat WebSocket, dan redaksi dirender kontinu pada canvas lokal. |
 | Local Backend Camera | Fallback lokal. | Kamera dibuka oleh OpenCV dari backend lokal. Tidak cocok untuk Azure Container Apps karena container tidak punya webcam user. |
 
 Untuk demo lokal yang paling stabil:
@@ -376,6 +376,7 @@ VITE_API_BASE_URL=https://privai-backend.orangebeach-03038aed.southeastasia.azur
 | GET | `/api/government/access-requests/{request_id}/secure-original` | Download original dengan one-time token. |
 | GET | `/api/audit-logs` | Lihat audit log. |
 | POST | `/api/live/redact-frame` | Redaksi satu frame ephemeral dari Browser Camera. |
+| WS | `/api/live/ws` | JPEG biner masuk, bounding box deteksi keluar untuk redaksi canvas real-time. |
 | POST | `/api/live/turbo/start` | Start Local Backend Camera stream untuk fallback lokal. |
 | POST | `/api/live/turbo/stop` | Stop Local Backend Camera stream. |
 | GET | `/api/live/turbo/status` | Status Local Backend Camera stream. |

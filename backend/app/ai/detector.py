@@ -1,3 +1,4 @@
+import os
 import time
 from pathlib import Path
 from threading import Lock, Thread
@@ -17,6 +18,7 @@ class YoloDetector:
         self.loaded = False
         self.loading = False
         self._lock = Lock()
+        self._predict_lock = Lock()
 
     @property
     def model_exists(self) -> bool:
@@ -39,11 +41,15 @@ class YoloDetector:
             return
 
         try:
+            config_dir = self.model_path.parent.parent / "storage" / ".ultralytics"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            os.environ.setdefault("YOLO_CONFIG_DIR", str(config_dir))
+
             from ultralytics import YOLO
 
             self.model = YOLO(str(self.model_path))
-            self.loaded = True
             self._warm_up()
+            self.loaded = True
         except Exception as exc:  # pragma: no cover - depends on local ML runtime
             self.load_error = str(exc)
             self.model = None
@@ -57,16 +63,14 @@ class YoloDetector:
         Thread(target=self.load, name="privai-yolo-loader", daemon=True).start()
 
     def _warm_up(self) -> None:
-        try:
-            dummy = np.zeros((64, 64, 3), dtype=np.uint8)
-            self.model.predict(dummy, conf=0.25, device=self.device, verbose=False)
-        except Exception as exc:  # warm-up failure should not kill API
-            self.load_error = f"warm-up warning: {exc}"
+        dummy = np.zeros((320, 320, 3), dtype=np.uint8)
+        self.model.predict(dummy, conf=0.25, imgsz=320, device=self.device, verbose=False)
 
     def predict(
         self,
         image: np.ndarray,
         confidence_threshold: float | dict[str, float],
+        inference_size: int | None = None,
     ) -> dict[str, Any]:
         if not self.loaded or self.model is None:
             if self.model_exists and not self.loading:
@@ -84,8 +88,11 @@ class YoloDetector:
             class_thresholds = None
             floor_conf = float(confidence_threshold)
 
+        image_size = 640 if inference_size is None else max(32, ((int(inference_size) + 31) // 32) * 32)
         started = time.perf_counter()
-        results = self.model.predict(image, conf=floor_conf, device=self.device, verbose=False)
+        # ponytail: one shared model is serialized; use a worker/model pool if multi-user throughput becomes necessary.
+        with self._predict_lock:
+            results = self.model.predict(image, conf=floor_conf, imgsz=image_size, device=self.device, verbose=False)
         latency_ms = (time.perf_counter() - started) * 1000
         detections: list[dict[str, Any]] = []
         if results:
@@ -121,6 +128,7 @@ class YoloDetector:
                     )
         return {
             "device": self.device,
+            "inference_size": image_size,
             "latency_ms": round(latency_ms, 2),
             "detection_count": len(detections),
             "detections": detections,

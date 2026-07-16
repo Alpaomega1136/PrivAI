@@ -106,6 +106,7 @@ export type LiveFrameInput = {
   redactionMode?: string;
   activeClasses?: string;
   disabledClasses?: string;
+  returnImage?: boolean;
 };
 
 export type TurboLiveInput = {
@@ -242,6 +243,13 @@ export function buildBackendFileUrl(relativeUrl?: string) {
   return `${activeApiBaseUrl}${relativeUrl}`;
 }
 
+export function buildBackendWebSocketUrl(path: string) {
+  const baseUrl = activeApiBaseUrl || window.location.origin;
+  const url = new URL(path, baseUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}
+
 export function getHealth() {
   return requestJson<HealthResponse>("/api/health");
 }
@@ -304,6 +312,7 @@ export function redactLiveFrame(input: LiveFrameInput) {
   const params = new URLSearchParams();
   params.set("confidence_threshold", String(input.confidenceThreshold ?? 0.25));
   params.set("redaction_mode", input.redactionMode || "blur");
+  params.set("return_image", String(input.returnImage ?? true));
   if (input.activeClasses?.trim()) params.set("active_classes", input.activeClasses.trim());
   if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());
 
@@ -320,8 +329,8 @@ export function startTurboLive(input: TurboLiveInput = {}) {
   params.set("confidence_threshold", String(input.confidenceThreshold ?? 0.25));
   params.set("redaction_mode", input.redactionMode || "blur");
   params.set("active_classes", input.activeClasses || "Wajah");
-  params.set("target_width", String(input.targetWidth ?? 416));
-  params.set("infer_interval_ms", String(input.inferIntervalMs ?? 90));
+  params.set("target_width", String(input.targetWidth ?? 320));
+  params.set("infer_interval_ms", String(input.inferIntervalMs ?? 180));
   params.set("jpeg_quality", String(input.jpegQuality ?? 75));
   params.set("box_hold_ms", String(input.boxHoldMs ?? 700));
   if (input.disabledClasses?.trim()) params.set("disabled_classes", input.disabledClasses.trim());
@@ -440,6 +449,7 @@ export function getRequiredBackendEndpoints() {
     { method: "GET", path: "/api/government/access-requests/{request_id}", feature: "Access request status" },
     { method: "GET", path: "/api/government/access-requests/{request_id}/secure-original", feature: "One-time original download" },
     { method: "GET", path: "/api/audit-logs", feature: "Security event trace" },
+    { method: "WS", path: "/api/live/ws", feature: "Persistent binary-frame detection transport" },
     { method: "POST", path: "/api/live/redact-frame", feature: "Browser camera frame redaction" },
     { method: "POST", path: "/api/live/turbo/start", feature: "Optional local-only backend camera stream" },
     { method: "POST", path: "/api/live/turbo/stop", feature: "Stop optional backend camera stream" },

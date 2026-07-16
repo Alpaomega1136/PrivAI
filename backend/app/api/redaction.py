@@ -21,7 +21,7 @@ from app.services.redaction_service import redact_image
 from app.services.robustness_service import robust_predict_with_tta
 from app.services.storage_service import save_operational_metadata, save_redacted_image_to_operational_zone
 from app.services.vault_service import encrypt_original_for_vault
-from app.utils.image_utils import get_image_shape, read_image_bytes_to_cv2, validate_image_filename
+from app.utils.image_utils import get_image_shape, read_document_bytes_to_cv2
 
 router = APIRouter(tags=["redaction"])
 settings = get_settings()
@@ -167,10 +167,9 @@ async def redact_upload(
     performance_settings = resolve_performance_settings(performance_mode, document_tta, tta_angles, guardrail_enabled, guardrail_mode)
 
     stage_started = time.perf_counter()
-    validate_image_filename(file.filename)
-    original_bytes = await file.read()
-    image = read_image_bytes_to_cv2(original_bytes)
     filename = file.filename or "upload.jpg"
+    original_bytes = await file.read()
+    image = read_document_bytes_to_cv2(original_bytes, filename)
     mark_timing("decode_ms", stage_started)
     dynamic_injection = None
 

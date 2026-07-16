@@ -44,8 +44,8 @@ class LiveTurboSession:
         redaction_mode: str = "blur",
         active_classes: str | None = "Wajah",
         disabled_classes: str | None = None,
-        target_width: int = 416,
-        infer_interval_ms: int = 90,
+        target_width: int = 320,
+        infer_interval_ms: int = 180,
         jpeg_quality: int = 75,
         box_hold_ms: int = 700,
     ) -> None:
@@ -150,7 +150,7 @@ class LiveTurboSession:
                 time.sleep(0.02)
                 continue
             try:
-                prediction = self.detector.predict(frame, self.confidence_threshold)
+                prediction = self.detector.predict(frame, self.confidence_threshold, self.target_width)
                 detections = prediction["detections"]
                 now = time.time()
 

@@ -7,6 +7,7 @@ import { JsonBlock } from "../../components/ui/JsonBlock";
 import { MultiSelectDropdown } from "../../components/ui/MultiSelectDropdown";
 import { NumericInput } from "../../components/ui/NumericInput";
 import {
+  buildBackendWebSocketUrl,
   buildTurboMjpegUrl,
   getTurboLiveStatus,
   redactLiveFrame,
@@ -15,6 +16,7 @@ import {
   stopTurboLive,
 } from "../../lib/api";
 import { PRIVACY_CLASSES } from "../../lib/constants";
+import { DetectionBox, getPaddedBox } from "../../lib/liveCanvas";
 
 type BrowserCameraDevice = {
   deviceId: string;
@@ -22,6 +24,11 @@ type BrowserCameraDevice = {
 };
 
 type CameraPipeline = "browser" | "backend";
+
+type LiveDetection = {
+  class_name?: string;
+  box?: DetectionBox;
+};
 
 const PAGE_ASSETS = {
   banner: "" as string,
@@ -99,19 +106,31 @@ async function getCameraPermissionState() {
 export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const outputCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pixelCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const browserIntervalRef = useRef<number | null>(null);
+  const browserSocketRef = useRef<WebSocket | null>(null);
+  const browserSocketConfigRef = useRef("");
+  const browserHttpFallbackRef = useRef(false);
+  const browserTimerRef = useRef<number | null>(null);
+  const browserLoopIdRef = useRef(0);
+  const browserRenderFrameRef = useRef<number | null>(null);
+  const browserRenderedFrameCountRef = useRef(0);
+  const browserFrameStartedAtRef = useRef(0);
+  const latestDetectionsRef = useRef<LiveDetection[]>([]);
+  const latestDetectionShapeRef = useRef({ width: 0, height: 0 });
+  const lastDetectionAtRef = useRef(0);
   const statusIntervalRef = useRef<number | null>(null);
-  const inFlightRef = useRef(false);
   const runningRef = useRef(false);
   const settingsRef = useRef({
     selectedDeviceId: "",
     confidenceThreshold: 0.25,
     redactionMode: "blur",
     activeClasses: ["Wajah"],
-    targetWidth: 640,
-    inferIntervalMs: 450,
-    jpegQuality: 75,
+    targetWidth: 320,
+    inferIntervalMs: 180,
+    jpegQuality: 60,
+    boxHoldMs: 700,
     selectedCameraLabel: "Default Browser Camera",
   });
 
@@ -124,12 +143,11 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.25);
   const [redactionMode, setRedactionMode] = useState("blur");
   const [activeClasses, setActiveClasses] = useState<string[]>(["Wajah"]);
-  const [targetWidth, setTargetWidth] = useState(640);
-  const [inferIntervalMs, setInferIntervalMs] = useState(450);
-  const [jpegQuality, setJpegQuality] = useState(75);
+  const [targetWidth, setTargetWidth] = useState(320);
+  const [inferIntervalMs, setInferIntervalMs] = useState(180);
+  const [jpegQuality, setJpegQuality] = useState(60);
   const [boxHoldMs, setBoxHoldMs] = useState(700);
   const [status, setStatus] = useState<Record<string, unknown> | null>(null);
-  const [processedFrameSrc, setProcessedFrameSrc] = useState("");
   const [backendStreamUrl, setBackendStreamUrl] = useState("");
   const [mjpegError, setMjpegError] = useState(false);
   const [message, setMessage] = useState("");
@@ -154,6 +172,7 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
     targetWidth,
     inferIntervalMs,
     jpegQuality,
+    boxHoldMs,
     selectedCameraLabel,
   };
 
@@ -229,75 +248,253 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
     throw lastError ?? new Error("Failed to open browser camera.");
   }
 
-  async function processBrowserFrame() {
-    if (!runningRef.current || activeSource !== "browser" || inFlightRef.current) return;
-
-    const frameBlob = await captureFrameBlob();
-    if (!frameBlob) return;
+  function applyBrowserDetectionResult(data: Record<string, unknown>) {
+    const detections = Array.isArray(data.detections) ? (data.detections as LiveDetection[]) : [];
+    if (detections.length > 0) {
+      latestDetectionsRef.current = detections;
+      const imageShape = data.image_shape as Record<string, unknown> | undefined;
+      latestDetectionShapeRef.current = {
+        width: Number(imageShape?.width ?? 0),
+        height: Number(imageShape?.height ?? 0),
+      };
+      lastDetectionAtRef.current = performance.now();
+    }
 
     const settings = settingsRef.current;
-    inFlightRef.current = true;
-    const response = await safeRequest(() =>
-      redactLiveFrame({
-        frameBlob,
-        confidenceThreshold: settings.confidenceThreshold,
-        redactionMode: settings.redactionMode,
-        activeClasses: settings.activeClasses.join(","),
-      }),
+    setError("");
+    setStatus((previous) => ({
+      running: true,
+      source: browserHttpFallbackRef.current ? "browser_http_fallback" : "browser_websocket",
+      camera_label: settings.selectedCameraLabel,
+      frame_counter: browserRenderedFrameCountRef.current,
+      inference_counter: Number(previous?.inference_counter ?? 0) + 1,
+      latest_stats: {
+        transport: browserHttpFallbackRef.current ? "HTTP" : "WebSocket",
+        inference_size: data.inference_size ?? settings.targetWidth,
+        latency_ms: data.latency_ms ?? 0,
+        detection_count: data.detection_count ?? 0,
+        redacted_count: data.redacted_count ?? 0,
+      },
+      privacy_policy: data.storage_policy,
+    }));
+  }
+
+  function renderBrowserFrame() {
+    const video = videoRef.current;
+    const canvas = outputCanvasRef.current;
+    if (!runningRef.current || !streamRef.current || !video || !canvas) return;
+
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
+      const settings = settingsRef.current;
+      const width = Math.min(settings.targetWidth, video.videoWidth);
+      const height = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * width));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      const context = canvas.getContext("2d");
+      const scratch = pixelCanvasRef.current;
+      const scratchContext = scratch?.getContext("2d");
+      if (context) {
+        context.filter = "none";
+        context.imageSmoothingEnabled = true;
+        context.drawImage(video, 0, 0, width, height);
+        browserRenderedFrameCountRef.current += 1;
+
+        const detectionAge = performance.now() - lastDetectionAtRef.current;
+        const detections = detectionAge <= settings.boxHoldMs ? latestDetectionsRef.current : [];
+        const detectionShape = latestDetectionShapeRef.current;
+        const scaleX = detectionShape.width > 0 ? width / detectionShape.width : 1;
+        const scaleY = detectionShape.height > 0 ? height / detectionShape.height : 1;
+        for (const detection of detections) {
+          if (detection.class_name && !settings.activeClasses.includes(detection.class_name)) continue;
+          const rawBox = detection.box;
+          if (!rawBox || !Object.values(rawBox).every(Number.isFinite)) continue;
+          const box = getPaddedBox({
+            x1: rawBox.x1 * scaleX,
+            y1: rawBox.y1 * scaleY,
+            x2: rawBox.x2 * scaleX,
+            y2: rawBox.y2 * scaleY,
+          }, width, height);
+          if (!box) continue;
+
+          const boxWidth = box.x2 - box.x1;
+          const boxHeight = box.y2 - box.y1;
+          if (settings.redactionMode === "black_box") {
+            context.fillStyle = "#000";
+            context.fillRect(box.x1, box.y1, boxWidth, boxHeight);
+          } else if (scratch && scratchContext) {
+            const pixelated = settings.redactionMode === "pixelate";
+            scratch.width = pixelated ? Math.max(1, Math.round(boxWidth / 14)) : boxWidth;
+            scratch.height = pixelated ? Math.max(1, Math.round(boxHeight / 14)) : boxHeight;
+            scratchContext.drawImage(
+              canvas,
+              box.x1,
+              box.y1,
+              boxWidth,
+              boxHeight,
+              0,
+              0,
+              scratch.width,
+              scratch.height,
+            );
+            context.save();
+            context.imageSmoothingEnabled = !pixelated;
+            context.filter = pixelated ? "none" : `blur(${Math.max(10, Math.round(Math.min(boxWidth, boxHeight) * 0.16))}px)`;
+            context.drawImage(scratch, 0, 0, scratch.width, scratch.height, box.x1, box.y1, boxWidth, boxHeight);
+            context.restore();
+          }
+        }
+      }
+    }
+
+    browserRenderFrameRef.current = window.requestAnimationFrame(renderBrowserFrame);
+  }
+
+  function startBrowserRenderLoop() {
+    if (browserRenderFrameRef.current) window.cancelAnimationFrame(browserRenderFrameRef.current);
+    browserRenderFrameRef.current = window.requestAnimationFrame(renderBrowserFrame);
+  }
+
+  function stopBrowserRenderLoop() {
+    if (browserRenderFrameRef.current) {
+      window.cancelAnimationFrame(browserRenderFrameRef.current);
+      browserRenderFrameRef.current = null;
+    }
+    latestDetectionsRef.current = [];
+    latestDetectionShapeRef.current = { width: 0, height: 0 };
+    lastDetectionAtRef.current = 0;
+    browserRenderedFrameCountRef.current = 0;
+  }
+
+  function scheduleBrowserFrame(loopId: number, callback: () => void) {
+    if (!runningRef.current || loopId !== browserLoopIdRef.current) return;
+    const elapsedMs = performance.now() - browserFrameStartedAtRef.current;
+    browserTimerRef.current = window.setTimeout(
+      callback,
+      Math.max(50, settingsRef.current.inferIntervalMs - elapsedMs),
     );
-    inFlightRef.current = false;
+  }
 
-    if (!runningRef.current || activeSource !== "browser") return;
+  async function processBrowserFrame(loopId: number) {
+    if (!runningRef.current || loopId !== browserLoopIdRef.current) return;
+    browserFrameStartedAtRef.current = performance.now();
+    try {
+      const frameBlob = await captureFrameBlob();
+      if (!frameBlob) return;
+      const settings = settingsRef.current;
+      const response = await safeRequest(() =>
+        redactLiveFrame({
+          frameBlob,
+          confidenceThreshold: settings.confidenceThreshold,
+          redactionMode: settings.redactionMode,
+          activeClasses: settings.activeClasses.join(","),
+          returnImage: false,
+        }),
+      );
+      if (!runningRef.current || loopId !== browserLoopIdRef.current) return;
+      if (!response.ok) {
+        setError(apiErrorMessage(response.error, "Failed to process live frame."));
+        return;
+      }
+      applyBrowserDetectionResult(response.data ?? {});
+    } finally {
+      scheduleBrowserFrame(loopId, () => void processBrowserFrame(loopId));
+    }
+  }
 
-    if (!response.ok) {
-      setError(apiErrorMessage(response.error, "Failed to process live frame."));
+  async function sendBrowserSocketFrame(loopId: number) {
+    if (!runningRef.current || loopId !== browserLoopIdRef.current) return;
+    const socket = browserSocketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      startBrowserHttpFallback(loopId, "WebSocket unavailable. Using HTTP detection fallback.");
       return;
     }
 
-    const data = response.data ?? {};
-    const frameBase64 = typeof data.frame_image_base64 === "string" ? data.frame_image_base64 : "";
-    const mimeType = typeof data.mime_type === "string" ? data.mime_type : "image/jpeg";
-    if (frameBase64) {
-      setProcessedFrameSrc(`data:${mimeType};base64,${frameBase64}`);
+    const frameBlob = await captureFrameBlob();
+    if (!frameBlob || !runningRef.current || loopId !== browserLoopIdRef.current) {
+      scheduleBrowserFrame(loopId, () => void sendBrowserSocketFrame(loopId));
+      return;
     }
 
-    setStatus((previous) => {
-      const previousFrameCounter = Number(previous?.frame_counter ?? 0);
-      const previousInferenceCounter = Number(previous?.inference_counter ?? 0);
-      return {
-        running: true,
-        source: "browser_camera",
-        camera_label: settings.selectedCameraLabel,
-        frame_counter: previousFrameCounter + 1,
-        inference_counter: previousInferenceCounter + 1,
-        latest_stats: {
-          latency_ms: data.latency_ms ?? 0,
-          detection_count: data.detection_count ?? 0,
-          redacted_count: data.redacted_count ?? 0,
-        },
-        privacy_policy: data.storage_policy,
-      };
+    const settings = settingsRef.current;
+    const config = JSON.stringify({
+      confidence_threshold: settings.confidenceThreshold,
+      redaction_mode: settings.redactionMode,
+      active_classes: settings.activeClasses,
     });
+    if (config !== browserSocketConfigRef.current) {
+      socket.send(config);
+      browserSocketConfigRef.current = config;
+    }
+    browserFrameStartedAtRef.current = performance.now();
+    socket.send(frameBlob);
+  }
+
+  function startBrowserHttpFallback(loopId: number, reason: string) {
+    if (!runningRef.current || loopId !== browserLoopIdRef.current || browserHttpFallbackRef.current) return;
+    browserHttpFallbackRef.current = true;
+    const socket = browserSocketRef.current;
+    browserSocketRef.current = null;
+    if (socket) {
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.close();
+    }
+    setMessage(reason);
+    void processBrowserFrame(loopId);
   }
 
   function startBrowserProcessingLoop() {
-    if (browserIntervalRef.current) {
-      window.clearInterval(browserIntervalRef.current);
-      browserIntervalRef.current = null;
+    stopBrowserProcessingLoop();
+    const loopId = ++browserLoopIdRef.current;
+    browserHttpFallbackRef.current = false;
+    browserSocketConfigRef.current = "";
+    try {
+      const socket = new WebSocket(buildBackendWebSocketUrl("/api/live/ws"));
+      browserSocketRef.current = socket;
+      socket.onopen = () => {
+        if (loopId !== browserLoopIdRef.current) return;
+        setMessage(`${settingsRef.current.selectedCameraLabel} active over WebSocket detection.`);
+        void sendBrowserSocketFrame(loopId);
+      };
+      socket.onmessage = (event) => {
+        if (!runningRef.current || loopId !== browserLoopIdRef.current) return;
+        try {
+          const data = JSON.parse(String(event.data)) as Record<string, unknown>;
+          if (data.type === "error") {
+            setError(String(data.message ?? "Live detection failed."));
+          } else {
+            applyBrowserDetectionResult(data);
+          }
+        } catch {
+          setError("Backend returned an invalid live detection response.");
+        }
+        scheduleBrowserFrame(loopId, () => void sendBrowserSocketFrame(loopId));
+      };
+      socket.onerror = () => startBrowserHttpFallback(loopId, "WebSocket failed. Using HTTP detection fallback.");
+      socket.onclose = () => startBrowserHttpFallback(loopId, "WebSocket closed. Using HTTP detection fallback.");
+    } catch {
+      startBrowserHttpFallback(loopId, "WebSocket is unsupported. Using HTTP detection fallback.");
     }
-    void processBrowserFrame();
-    browserIntervalRef.current = window.setInterval(
-      () => void processBrowserFrame(),
-      Math.max(120, settingsRef.current.inferIntervalMs),
-    );
   }
 
   function stopBrowserProcessingLoop() {
-    if (browserIntervalRef.current) {
-      window.clearInterval(browserIntervalRef.current);
-      browserIntervalRef.current = null;
+    browserLoopIdRef.current += 1;
+    if (browserTimerRef.current) {
+      window.clearTimeout(browserTimerRef.current);
+      browserTimerRef.current = null;
     }
-    inFlightRef.current = false;
+    const socket = browserSocketRef.current;
+    browserSocketRef.current = null;
+    if (socket) {
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.close();
+    }
+    browserHttpFallbackRef.current = false;
+    browserSocketConfigRef.current = "";
   }
 
   async function startBackendLiveCamera(note?: string) {
@@ -305,9 +502,9 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
     setError("");
     setMessage(note || "");
     stopBrowserProcessingLoop();
+    stopBrowserRenderLoop();
     stopMediaStream(streamRef.current);
     streamRef.current = null;
-    setProcessedFrameSrc("");
     setMjpegError(false);
 
     const response = await safeRequest(() =>
@@ -362,6 +559,7 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
 
     try {
       stopBrowserProcessingLoop();
+      stopBrowserRenderLoop();
       stopMediaStream(streamRef.current);
       const stream = await requestBrowserCameraStream();
       const settings = settingsRef.current;
@@ -376,7 +574,6 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
       setRunning(true);
       setActiveSource("browser");
       setBackendStreamUrl("");
-      setProcessedFrameSrc("");
       setStatus({
         running: true,
         source: "browser_camera",
@@ -387,9 +584,12 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
       });
       await refreshCameraDevices();
       setCameraPermissionState(await getCameraPermissionState());
+      startBrowserRenderLoop();
       startBrowserProcessingLoop();
-      setMessage(`${settings.selectedCameraLabel} active. Frames are sent ephemerally to backend redaction.`);
+      setMessage(`${settings.selectedCameraLabel} active. Connecting optimized live detection.`);
     } catch (cameraError) {
+      stopBrowserProcessingLoop();
+      stopBrowserRenderLoop();
       stopMediaStream(streamRef.current);
       streamRef.current = null;
       runningRef.current = false;
@@ -419,7 +619,9 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
 
   async function stopLiveCamera() {
     setIsBusy(true);
+    runningRef.current = false;
     stopBrowserProcessingLoop();
+    stopBrowserRenderLoop();
     stopMediaStream(streamRef.current);
     streamRef.current = null;
 
@@ -427,10 +629,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
       await safeRequest(() => stopTurboLive(sessionId));
     }
 
-    runningRef.current = false;
     setRunning(false);
     setActiveSource(null);
-    setProcessedFrameSrc("");
     setBackendStreamUrl("");
     setMjpegError(false);
     if (videoRef.current) {
@@ -450,13 +650,6 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
   }, [isActive]);
 
   useEffect(() => {
-    if (runningRef.current && activeSource === "browser") {
-      startBrowserProcessingLoop();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inferIntervalMs, activeSource]);
-
-  useEffect(() => {
     if (!running || activeSource !== "backend") return undefined;
     statusIntervalRef.current = window.setInterval(async () => {
       const response = await safeRequest(() => getTurboLiveStatus(sessionId));
@@ -472,7 +665,9 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
 
   useEffect(() => {
     return () => {
+      runningRef.current = false;
       stopBrowserProcessingLoop();
+      stopBrowserRenderLoop();
       stopMediaStream(streamRef.current);
       void safeRequest(() => stopTurboLive(sessionId));
     };
@@ -496,8 +691,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
         <div className="user-hero-copy">
           <h1>Live Stream Privacy Filter.</h1>
           <p>
-            Deployed mode uses browser camera through HTTPS. Local mode can fall back to backend OpenCV camera when
-            browser permission is blocked.
+            Browser Camera uses persistent WebSocket detection and local canvas redaction. Local mode can fall back to
+            backend OpenCV camera when browser permission is blocked.
           </p>
         </div>
       </section>
@@ -522,9 +717,27 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
               muted
               playsInline
               autoPlay
-              style={{ display: activeSource === "browser" && running && !processedFrameSrc ? "block" : "none" }}
+              style={{
+                display: activeSource === "browser" && running ? "block" : "none",
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                opacity: 0,
+                pointerEvents: "none",
+              }}
             />
             <canvas ref={canvasRef} style={{ display: "none" }} />
+            <canvas ref={pixelCanvasRef} style={{ display: "none" }} />
+            <canvas
+              ref={outputCanvasRef}
+              style={{
+                display: activeSource === "browser" && running ? "block" : "none",
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+              }}
+            />
             {activeSource === "backend" && backendStreamUrl && !mjpegError ? (
               <img
                 src={backendStreamUrl}
@@ -548,8 +761,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                   Reconnect Stream
                 </button>
               </div>
-            ) : processedFrameSrc ? (
-              <img src={processedFrameSrc} alt="Redacted live camera frame" />
+            ) : activeSource === "browser" && running ? (
+              null
             ) : !running ? (
               <div className="empty-state live-empty-state">
                 <Video size={46} />
@@ -598,8 +811,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                     <option value="backend">Local Backend Camera - local fallback only</option>
                   </select>
                   <small className="field-hint">
-                    Browser Camera works on HTTPS deploy. Local Backend Camera uses OpenCV on your laptop and is not for
-                    Azure container camera.
+                    Browser Camera uses WebSocket detection over HTTPS/WSS. Local Backend Camera uses OpenCV on your
+                    laptop and is not for Azure container camera.
                   </small>
                 </Field>
 
@@ -665,25 +878,23 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
                 </Field>
                 <div className="form-grid compact-form-grid">
                   <Field label="Frame Width">
-                    <NumericInput min={240} max={1280} value={targetWidth} fallbackValue={640} onValueChange={setTargetWidth} />
+                    <NumericInput min={240} max={1280} value={targetWidth} fallbackValue={320} onValueChange={setTargetWidth} />
                   </Field>
                   <Field label="Infer Interval (ms)">
                     <NumericInput
                       min={120}
                       max={2000}
                       value={inferIntervalMs}
-                      fallbackValue={450}
+                      fallbackValue={180}
                       onValueChange={setInferIntervalMs}
                     />
                   </Field>
                   <Field label="JPEG Quality">
-                    <NumericInput min={35} max={95} value={jpegQuality} fallbackValue={75} onValueChange={setJpegQuality} />
+                    <NumericInput min={35} max={95} value={jpegQuality} fallbackValue={60} onValueChange={setJpegQuality} />
                   </Field>
-                  {cameraPipeline === "backend" && (
-                    <Field label="Box Hold (ms)">
-                      <NumericInput min={100} max={5000} value={boxHoldMs} fallbackValue={700} onValueChange={setBoxHoldMs} />
-                    </Field>
-                  )}
+                  <Field label="Box Hold (ms)">
+                    <NumericInput min={100} max={5000} value={boxHoldMs} fallbackValue={700} onValueChange={setBoxHoldMs} />
+                  </Field>
                 </div>
               </div>
             </details>
@@ -727,8 +938,8 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
             <div>
               <strong>Ephemeral Processing</strong>
               <p>
-                Browser Camera is the deploy-safe mode. Local Backend Camera is only a local fallback when browser camera
-                permission is blocked during development.
+                Frames are rendered continuously in the browser. Only compressed detection frames are sent
+                ephemerally; bounding boxes return over WebSocket and are never stored.
               </p>
             </div>
           </div>

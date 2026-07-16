@@ -2,11 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import audit, crypto, government, live, redaction, runtime, storage, system
+from app.ai.runtime import detector
 from app.core.config import get_settings
 from app.db.database import init_db, session_scope
-from app.services.authenticity_service import load_in_background as load_ocr_in_background
 from app.services.vault_service import ensure_active_vault_key
-from app.ai.runtime import detector
 
 settings = get_settings()
 
@@ -30,8 +29,9 @@ def on_startup() -> None:
     init_db()
     with session_scope() as db:
         ensure_active_vault_key(db)
-    detector.load_in_background()
-    load_ocr_in_background()
+    detector.load()
+    if not detector.loaded:
+        raise RuntimeError(f"Failed to load detection model: {detector.load_error or 'unknown error'}")
 
 
 @app.get("/")

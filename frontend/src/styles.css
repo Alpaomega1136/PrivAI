@@ -3386,6 +3386,13 @@ tr:last-child td { border-bottom: none; }
   display: block;
   background: #FFFFFF;
 }
+.document-pdf-preview {
+  width: 100%;
+  height: 560px;
+  border: 0;
+  background: #FFFFFF;
+  pointer-events: none;
+}
 .document-drop-empty {
   display: grid;
   place-items: center;

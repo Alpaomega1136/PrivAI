@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
           target: backendTarget,
           changeOrigin: true,
           secure: false,
+          ws: true,
         },
       },
     },

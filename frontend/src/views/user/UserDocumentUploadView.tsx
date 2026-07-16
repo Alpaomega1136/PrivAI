@@ -62,11 +62,14 @@ export function UserDocumentUploadView({
       return;
     }
 
-    const isSupportedImage = nextFile.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(nextFile.name);
-    if (!isSupportedImage) {
+    const isSupportedDocument =
+      nextFile.type.startsWith("image/") ||
+      nextFile.type === "application/pdf" ||
+      /\.(jpe?g|png|webp|pdf)$/i.test(nextFile.name);
+    if (!isSupportedDocument) {
       setFile(null);
       setPreview("");
-      setFileError("File harus berupa gambar JPG, PNG, atau WEBP.");
+      setFileError("File harus berupa JPG, PNG, WEBP, atau PDF satu halaman.");
       return;
     }
 
@@ -126,6 +129,7 @@ export function UserDocumentUploadView({
   }
 
   const redactedUrl = buildBackendFileUrl(readNestedString(result?.data, ["operational_zone", "redacted_file", "url"]));
+  const isPdf = file?.type === "application/pdf" || /\.pdf$/i.test(file?.name ?? "");
   const detectionCount = result?.ok ? (result.data?.detections as unknown[])?.length ?? 0 : 0;
   const redactedCount = result?.ok ? Number(result.data?.redacted_count ?? 0) : 0;
   const performance = result?.ok ? ((result.data?.performance as Record<string, unknown> | undefined) ?? null) : null;
@@ -254,14 +258,28 @@ export function UserDocumentUploadView({
               onDragLeave={onFileDragLeave}
               onDrop={onFileDrop}
             >
-              <input type="file" accept="image/*" onChange={onFileChange} />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
+                onChange={onFileChange}
+              />
               {preview ? (
-                <img src={preview} alt="Original document preview" />
+                isPdf ? (
+                  <object className="document-pdf-preview" data={preview} type="application/pdf" aria-label="PDF preview">
+                    <div className="document-drop-empty">
+                      <FileText size={42} />
+                      <strong>{file?.name}</strong>
+                      <span>PDF satu halaman siap diproses.</span>
+                    </div>
+                  </object>
+                ) : (
+                  <img src={preview} alt="Original document preview" />
+                )
               ) : (
                 <div className="document-drop-empty">
                   <FileText size={42} />
                   <strong>Drag & drop dokumen di sini</strong>
-                  <span>atau klik untuk memilih gambar JPG, PNG, atau WEBP</span>
+                  <span>atau klik untuk memilih JPG, PNG, WEBP, atau PDF satu halaman</span>
                 </div>
               )}
             </label>

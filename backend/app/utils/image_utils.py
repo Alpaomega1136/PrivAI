@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import cv2
@@ -7,6 +8,10 @@ from fastapi import HTTPException, status
 from app.utils.file_utils import slugify_filename
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_DOCUMENT_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | {".pdf"}
+MAX_PDF_BYTES = 20 * 1024 * 1024
+MAX_PDF_RENDER_PIXELS = 20_000_000
+PDF_RENDER_DPI = 150
 
 
 def validate_image_filename(filename: str | None) -> None:
@@ -18,6 +23,15 @@ def validate_image_filename(filename: str | None) -> None:
         )
 
 
+def validate_document_filename(filename: str | None) -> None:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid document extension. Allowed: {', '.join(sorted(ALLOWED_DOCUMENT_EXTENSIONS))}",
+        )
+
+
 def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
     if not image_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file")
@@ -26,6 +40,43 @@ def read_image_bytes_to_cv2(image_bytes: bytes) -> np.ndarray:
     if image is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unsupported image bytes")
     return image
+
+
+def read_document_bytes_to_cv2(document_bytes: bytes, filename: str | None) -> np.ndarray:
+    validate_document_filename(filename)
+    if Path(filename or "").suffix.lower() != ".pdf":
+        return read_image_bytes_to_cv2(document_bytes)
+    if not document_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty PDF file")
+    if len(document_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="PDF exceeds the 20 MB limit")
+
+    import pymupdf
+
+    try:
+        document = pymupdf.open(stream=document_bytes, filetype="pdf")
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or corrupted PDF") from exc
+
+    with document:
+        if document.needs_pass:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password-protected PDFs are not supported")
+        if document.page_count != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MVP PDF upload currently supports exactly one page",
+            )
+
+        page = document[0]
+        scale = PDF_RENDER_DPI / 72
+        width = math.ceil(page.rect.width * scale)
+        height = math.ceil(page.rect.height * scale)
+        if width <= 0 or height <= 0 or width * height > MAX_PDF_RENDER_PIXELS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PDF page dimensions are too large")
+
+        pixmap = page.get_pixmap(dpi=PDF_RENDER_DPI, colorspace=pymupdf.csRGB, alpha=False)
+        rgb = np.frombuffer(pixmap.samples, dtype=np.uint8).reshape(pixmap.height, pixmap.width, 3)
+        return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
 def get_image_shape(image: np.ndarray) -> dict[str, int]:

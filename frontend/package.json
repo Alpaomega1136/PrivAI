@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:live": "node --experimental-strip-types --test tests/live-canvas.test.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -14,7 +15,7 @@
     "react": "latest",
     "react-dom": "latest",
     "typescript": "latest",
-    "vite": "latest"
+    "vite": "^8.1.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
