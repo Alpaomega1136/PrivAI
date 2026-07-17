@@ -1,4 +1,4 @@
-# PrivAI — full stack (FastAPI backend + Vite/nginx frontend).
+# Spectre — full stack (FastAPI backend + Vite/nginx frontend).
 #   docker compose up --build      → build + run
 #   open http://localhost:5173     → app
 #   open http://localhost:8000/docs → backend API docs

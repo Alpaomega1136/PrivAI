@@ -13,8 +13,8 @@ const PAGE_ASSETS = {
 // ╚══════════════════════════════════════╝
 
 const DETAILS = [
-  "Pilih salah satu tool: unggah dokumen gambar (JPG/PNG/WEBP) atau jalankan Live Stream Privacy Filter dari kamera. Keduanya memproses input secara lokal melalui backend PrivAI.",
-  "Model deteksi PrivAI memindai input dan menandai objek sensitif: KTP, SIM, Paspor, teks NIK, wajah, dan plat nomor. Tiap kelas punya ambang confidence yang dikalibrasi.",
+  "Pilih salah satu tool: unggah dokumen (JPG/PNG/WEBP/PDF satu halaman) atau jalankan Live Stream Privacy Filter dari kamera. Keduanya diproses di dalam privacy boundary Spectre.",
+  "Model deteksi Spectre memindai input dan menandai objek sensitif: KTP, SIM, Paspor, teks NIK, wajah, dan plat nomor. Tiap kelas punya ambang confidence yang dikalibrasi.",
   "Area berisiko langsung diredaksi secara visual (black box, blur, atau pixelate). Guardrail false-positive menyaring deteksi yang meragukan sebelum redaksi final.",
   "Hasil tersensor siap dibagikan dengan aman. Dokumen original dienkripsi ke Sovereign Vault, sementara Operational Zone hanya menyimpan output tersensor dan metadata non-privat.",
 ];
@@ -25,7 +25,7 @@ export function UserHowItWorksView({ onNavigate }: { onNavigate: (view: UserView
       {PAGE_ASSETS.banner && <img className="page-banner" src={PAGE_ASSETS.banner} alt="" />}
       <section className="user-hero user-hero-compact">
         <div className="user-hero-copy">
-          <h1>How PrivAI works.</h1>
+          <h1>How Spectre works.</h1>
           <p>Empat langkah sederhana, dari input mentah sampai output yang aman dibagikan.</p>
         </div>
       </section>

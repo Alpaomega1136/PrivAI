@@ -163,8 +163,8 @@ export function UserDocumentUploadView({
         <div className="user-hero-copy">
           <h1>Document Privacy Shield.</h1>
           <p>
-            Upload dokumen identitas, biarkan PrivAI mendeteksi area sensitif secara lokal, lalu bagikan hanya output
-            yang sudah aman.
+            Upload dokumen identitas, biarkan Spectre melindungi area sensitif, lalu bagikan hanya output yang sudah
+            aman.
           </p>
         </div>
       </section>
@@ -311,7 +311,7 @@ export function UserDocumentUploadView({
                 <div className="document-drop-empty muted-empty">
                   <EyeOff size={42} />
                   <strong>Hasil redaksi akan tampil di sini</strong>
-                  <span>PrivAI akan menampilkan output aman setelah proses selesai.</span>
+                  <span>Spectre akan menampilkan output aman setelah proses selesai.</span>
                 </div>
               )}
             </div>

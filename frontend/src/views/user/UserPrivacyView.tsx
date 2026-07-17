@@ -45,7 +45,7 @@ export function UserPrivacyView() {
         <div className="user-hero-copy">
           <h1>Privacy-first by design.</h1>
           <p>
-            PrivAI dibangun supaya data identitas kamu terlindungi di setiap langkah &mdash; dari deteksi lokal sampai
+            Spectre dibangun supaya data identitas kamu terlindungi di setiap langkah &mdash; dari deteksi sampai
             penyimpanan terenkripsi.
           </p>
         </div>
@@ -63,7 +63,7 @@ export function UserPrivacyView() {
         </div>
       </section>
 
-      <Panel title="Apa yang TIDAK dilakukan PrivAI" eyebrow="Transparansi" icon={<LockKeyhole />}>
+      <Panel title="Apa yang TIDAK dilakukan Spectre" eyebrow="Transparansi" icon={<LockKeyhole />}>
         <ul className="privacy-list">
           <li>Tidak menyimpan dokumen original di area yang bisa diakses umum.</li>
           <li>Tidak mengirim private key ke User Zone maupun Operational Zone.</li>

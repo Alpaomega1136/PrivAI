@@ -29,7 +29,7 @@ export function UserHomeView({ onNavigate }: { onNavigate: (view: UserViewId) =>
         <div className="tool-card-grid">
           <ToolCard
             title="Document Privacy Shield"
-            description="Unggah dokumen identitas dan biarkan PrivAI meredaksi area sensitif sebelum dibagikan."
+            description="Unggah dokumen identitas dan biarkan Spectre meredaksi area sensitif sebelum dibagikan."
             ctaLabel="Document Upload"
             accent="blue"
             icon={<FileText size={24} />}

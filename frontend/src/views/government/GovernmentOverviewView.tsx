@@ -56,7 +56,7 @@ export function GovernmentOverviewView({
     <div className="view-stack">
       {PAGE_ASSETS.banner && <img className="page-banner" src={PAGE_ASSETS.banner} alt="" />}
       <section className="hero-panel">
-        <h2>Government Console PrivAI</h2>
+        <h2>Government Console Spectre</h2>
         <p className="lead">
           Pantau Operational Zone, Sovereign Vault, otorisasi akses original, runtime policy, dan audit trail dari satu
           tempat. Console internal, bukan halaman publik.

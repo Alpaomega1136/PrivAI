@@ -97,7 +97,7 @@ export function DynamicInjectionView({
           <div>
             <strong>Validasi Keamanan</strong>
             <p>
-              Dynamic Injection di PrivAI adalah konfigurasi runtime tervalidasi, bukan eksekusi kode (No eval). Seluruh
+              Dynamic Injection di Spectre adalah konfigurasi runtime tervalidasi, bukan eksekusi kode (No eval). Seluruh
               struktur JSON divalidasi oleh backend sebelum diterapkan.
             </p>
           </div>

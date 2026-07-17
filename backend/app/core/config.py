@@ -26,7 +26,7 @@ DEFAULT_CLASS_CONFIDENCE: Dict[str, float] = {
 
 
 class Settings(BaseSettings):
-    app_name: str = "PrivAI"
+    app_name: str = "Spectre"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
 

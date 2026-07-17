@@ -128,7 +128,7 @@ export function AuditLogView({
         </div>
         <div className="audit-hero-copy">
           <span>Security Audit Trail</span>
-          <h2>Trace every sensitive action across PrivAI zones.</h2>
+          <h2>Trace every sensitive action across Spectre zones.</h2>
           <p>
             Audit Log membantu investigator melihat siapa melakukan apa, kapan, pada zone mana, dan record mana yang
             terdampak tanpa membuka data privat.

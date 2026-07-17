@@ -80,7 +80,7 @@ def load_in_background() -> None:
     """Warm up the OCR reader off the request path (call once at startup)."""
     if _reader is not None or _reader_failed:
         return
-    threading.Thread(target=_get_reader, name="privai-ocr-loader", daemon=True).start()
+    threading.Thread(target=_get_reader, name="spectre-ocr-loader", daemon=True).start()
 
 
 def ocr_status() -> dict[str, Any]:

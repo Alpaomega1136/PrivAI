@@ -34,7 +34,7 @@ export type NavItem<T extends string> = {
 };
 
 export const userNavItems: NavItem<UserViewId>[] = [
-  { id: "home", label: "Home", icon: createElement(Home, { size: 18 }), description: "Beranda PrivAI" },
+  { id: "home", label: "Home", icon: createElement(Home, { size: 18 }), description: "Beranda Spectre" },
   { id: "privacy", label: "Privacy", icon: createElement(ShieldCheck, { size: 18 }), description: "Privacy-first flow" },
   { id: "how-it-works", label: "How It Works", icon: createElement(Gauge, { size: 18 }), description: "Langkah demi langkah" },
 ];

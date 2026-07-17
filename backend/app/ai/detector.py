@@ -60,7 +60,7 @@ class YoloDetector:
     def load_in_background(self) -> None:
         if self.loaded or self.loading or not self.model_exists:
             return
-        Thread(target=self.load, name="privai-yolo-loader", daemon=True).start()
+        Thread(target=self.load, name="spectre-yolo-loader", daemon=True).start()
 
     def _warm_up(self) -> None:
         dummy = np.zeros((320, 320, 3), dtype=np.uint8)

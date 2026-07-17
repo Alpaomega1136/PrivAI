@@ -13,10 +13,10 @@ export function HeroIdentityProtection({
   return (
     <section className="user-hero">
       <div className="user-hero-copy">
-        <h1>Protect your private identity before it leaves your device.</h1>
+        <h1>Protect your identity before it reaches the destination.</h1>
         <p>
-          PrivAI detects sensitive identity information in documents and live camera feeds, then redacts it locally
-          before sharing.
+          Spectre detects sensitive identity information inside a controlled privacy boundary, then delivers only the
+          protected visual output for operational use.
         </p>
       </div>
       <div className="user-hero-visual">

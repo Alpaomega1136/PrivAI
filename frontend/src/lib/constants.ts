@@ -1,4 +1,4 @@
-// Shared constants for PrivAI frontend.
+// Shared constants for Spectre frontend.
 
 export const PRIVACY_CLASSES = ["KTP", "SIM", "Paspor", "NIK_Teks", "Wajah", "Plat_Nomor"];
 

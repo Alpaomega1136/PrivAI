@@ -417,7 +417,7 @@ export async function downloadGovernmentOriginal(input: {
     { headers: { "X-Government-Token": input.governmentToken } },
   );
   const blob = await response.blob();
-  const filename = response.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1] || "privai-original.bin";
+  const filename = response.headers.get("content-disposition")?.match(/filename="(.+)"/)?.[1] || "spectre-original.bin";
   return { blob, filename };
 }
 

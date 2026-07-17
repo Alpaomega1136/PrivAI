@@ -12,7 +12,7 @@ settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
-    description="Government-first local visual privacy firewall API.",
+    description="Spectre visual privacy and safety middleware API.",
 )
 
 app.add_middleware(

@@ -86,7 +86,7 @@ export function GovernmentAccessView({ latestRecordId }: { latestRecordId: strin
 
   const [viewerUrl, setViewerUrl] = useState("");
   const [originalBlobUrl, setOriginalBlobUrl] = useState("");
-  const [originalFilename, setOriginalFilename] = useState("privai-original.bin");
+  const [originalFilename, setOriginalFilename] = useState("spectre-original.bin");
 
   useEffect(() => {
     if (latestRecordId && !recordId) setRecordId(latestRecordId);

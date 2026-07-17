@@ -705,7 +705,7 @@ export function UserLiveFilterView({ isActive }: { isActive: boolean }) {
               {running ? "LIVE" : "OFFLINE"}
             </div>
             <div className="live-stream-title">
-              <strong>PrivAI Secure Stream</strong>
+              <strong>Spectre Secure Stream</strong>
               <small>{selectedCameraLabel}</small>
             </div>
             <div className="live-platform-count">Source: {sourceLabel}</div>

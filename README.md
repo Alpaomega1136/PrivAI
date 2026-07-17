@@ -6,13 +6,13 @@
 </p>
 
 <p align="center">
-  <img src="PrivAI_LOGO.png" alt="PrivAI Logo" width="260" />
+  <img src="frontend/src/assets/Spectre_logo.svg" alt="Spectre Logo" width="420" />
 </p>
 
-<h1 align="center">PrivAI</h1>
+<h1 align="center">Spectre</h1>
 
 <p align="center">
-  <strong>Government-first visual privacy firewall for identity documents and live visual streams.</strong>
+  <strong>Visual privacy and safety middleware for documents and live visual streams.</strong>
 </p>
 
 <p align="center">
@@ -23,17 +23,17 @@
   <a href="https://privai-backend.orangebeach-03038aed.southeastasia.azurecontainerapps.io/api/health"><strong>Backend Health</strong></a>
 </p>
 
-PrivAI adalah aplikasi **visual privacy firewall** berbasis AI untuk mendeteksi dan meredaksi data identitas sensitif pada dokumen dan live visual stream. Aplikasi ini dirancang untuk skenario **Smart Governance / Public Service**, dengan alur keamanan yang memisahkan hasil redaksi operasional dan original terenkripsi.
+Spectre adalah **visual privacy and safety middleware** berbasis AI untuk mendeteksi dan melindungi data identitas sensitif pada dokumen dan live visual stream. Spectre bekerja sebagai privacy boundary antara masyarakat dan layanan tujuan, dengan alur keamanan yang memisahkan hasil redaksi operasional dan original terenkripsi.
 
-PrivAI memproses gambar menggunakan YOLO lokal, menyimpan hasil redaksi di **Operational Zone**, menyimpan original terenkripsi di **Sovereign Vault**, dan menyediakan **Government Access API** untuk membuka original hanya melalui request, approval, one-time token, dan audit log.
+Spectre memproses gambar menggunakan YOLO lokal, menyimpan hasil redaksi di **Operational Zone**, menyimpan original terenkripsi di **Sovereign Vault**, dan menyediakan **Government Access API** untuk membuka original hanya melalui request, approval, one-time token, dan audit log.
 
 ## Repository About
 
 | Field | Value |
 |---|---|
-| Description | Government-first visual privacy firewall for detecting, redacting, and securely governing sensitive identity data with local YOLO inference, Sovereign Vault encryption, Dynamic Injection policy, and audit logs. |
+| Description | Visual privacy and safety middleware for detecting, redacting, and securely governing sensitive identity data with local YOLO inference, Sovereign Vault encryption, runtime policy, and audit logs. |
 | Website | https://privai-frontend.orangebeach-03038aed.southeastasia.azurecontainerapps.io |
-| Topics | `privai`, `privacy`, `fastapi`, `react`, `yolo`, `computer-vision`, `redaction`, `smart-governance`, `sovereign-vault`, `audit-log`, `azure-container-apps` |
+| Topics | `spectre`, `privacy`, `safety`, `fastapi`, `react`, `yolo`, `computer-vision`, `redaction`, `sovereign-vault`, `audit-log`, `azure-container-apps` |
 
 ## Demo Online
 
@@ -334,7 +334,7 @@ Untuk deploy online, gunakan `Browser Camera` karena kamera harus berasal dari b
 Backend example:
 
 ```env
-APP_NAME=PrivAI
+APP_NAME=Spectre
 MODEL_PATH=./models/privai_epoch50.pt
 MODEL_CONFIDENCE=0.35
 MODEL_DEVICE=cpu

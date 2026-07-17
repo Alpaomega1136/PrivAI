@@ -110,8 +110,8 @@ class LiveTurboSession:
         self.running = True
         self.started_at = time.time()
         self.last_error = None
-        self.capture_thread = Thread(target=self._capture_loop, name=f"PrivAI-Live-Capture-{self.session_id}", daemon=True)
-        self.inference_thread = Thread(target=self._inference_loop, name=f"PrivAI-Live-Inference-{self.session_id}", daemon=True)
+        self.capture_thread = Thread(target=self._capture_loop, name=f"Spectre-Live-Capture-{self.session_id}", daemon=True)
+        self.inference_thread = Thread(target=self._inference_loop, name=f"Spectre-Live-Inference-{self.session_id}", daemon=True)
         self.capture_thread.start()
         self.inference_thread.start()
 
@@ -226,7 +226,7 @@ class LiveTurboSession:
 
     def _placeholder_frame(self) -> np.ndarray:
         frame = np.zeros((360, 640, 3), dtype=np.uint8)
-        cv2.putText(frame, "PrivAI Live Stream", (42, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (245, 247, 237), 2)
+        cv2.putText(frame, "Spectre Live Stream", (42, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (245, 247, 237), 2)
         cv2.putText(frame, "Waiting for camera frame...", (42, 210), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (210, 220, 210), 2)
         return frame
 

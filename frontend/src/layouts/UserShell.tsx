@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 import aiConnectLogo from "../assets/AiConnect.png";
 import dtetiLogo from "../assets/DTETI.png";
 import finditLogo from "../assets/FINDIT.png";
-import brandLogo from "../assets/PrivAI_logo.png";
+import brandLogo from "../assets/Spectre_logo.svg";
 import ugmLogo from "../assets/ugm.png";
 import { ModeSwitch } from "../components/ModeSwitch";
 import { AppMode, UserViewId, userNavItems } from "../lib/navigation";
@@ -49,7 +49,7 @@ export function UserShell({
         </nav>
 
         <button type="button" className="user-brand" onClick={() => onNavigate("home")}>
-          <img className="user-brand-logo" src={BRAND_LOGO} alt="PrivAI" />
+          <img className="user-brand-logo" src={BRAND_LOGO} alt="Spectre" />
         </button>
 
         <div className="user-navbar-right">
@@ -65,8 +65,8 @@ export function UserShell({
       <main className="user-main">{children}</main>
 
       <footer className="user-footer">
-        <span>PrivAI &mdash; Visual Privacy Firewall</span>
-        <span>Local detection &middot; Visual redaction &middot; Encrypted vault</span>
+        <span>Spectre &mdash; Visual Privacy &amp; Safety Middleware</span>
+        <span>Data invisible &middot; Privacy intact</span>
       </footer>
     </div>
   );

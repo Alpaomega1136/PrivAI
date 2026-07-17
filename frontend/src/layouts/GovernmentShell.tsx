@@ -4,12 +4,12 @@ import { ReactNode } from "react";
 import aiConnectLogo from "../assets/AiConnect.png";
 import dtetiLogo from "../assets/DTETI.png";
 import finditLogo from "../assets/FINDIT.png";
-import privaiLogo from "../assets/PrivAI_logo.png";
+import spectreLogo from "../assets/Spectre_logo.svg";
 import ugmLogo from "../assets/ugm.png";
 import { ModeSwitch } from "../components/ModeSwitch";
 import { AppMode, GovernmentViewId, governmentNavItems } from "../lib/navigation";
 
-const BRAND_LOGO = privaiLogo;
+const BRAND_LOGO = spectreLogo;
 const PARTNER_LOGOS = [
   { src: ugmLogo, alt: "UGM" },
   { src: dtetiLogo, alt: "DTETI" },
@@ -41,7 +41,7 @@ export function GovernmentShell({
     <div className="app-shell">
       <aside className="sidebar">
         <button type="button" className="brand-card government-brand-card" onClick={() => onNavigate("overview")}>
-          <img className="government-brand-logo" src={BRAND_LOGO} alt="PrivAI Logo" />
+          <img className="government-brand-logo" src={BRAND_LOGO} alt="Spectre Logo" />
           <small>Government Console</small>
         </button>
         <nav>
